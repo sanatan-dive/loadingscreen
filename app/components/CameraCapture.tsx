@@ -132,7 +132,25 @@ export function CameraCapture({ onCapture, onClose }: Props) {
         gridTemplateRows: '1fr auto',
       }}
     >
-      <div style={{ position: 'relative', overflow: 'hidden' }}>
+      {/*
+        The preview is a SQUARE, because shoot() keeps a square centre crop of
+        the raw frame. Shown full-width it lied: on a 1280x720 webcam the shot
+        is only the middle 56% of what the preview displayed, so a face framed
+        inside the guide could still be cropped away. A square box with
+        object-fit: cover crops the source exactly the way the canvas does, so
+        what is inside this box is what gets captured.
+      */}
+      <div style={{ position: 'relative', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+        <div
+          style={{
+            position: 'relative',
+            aspectRatio: '1 / 1',
+            height: 'min(100%, 100vw)',
+            maxWidth: '100%',
+            overflow: 'hidden',
+            background: '#000',
+          }}
+        >
         <video
           ref={videoRef}
           playsInline
@@ -161,7 +179,8 @@ export function CameraCapture({ onCapture, onClose }: Props) {
           >
             <div
               style={{
-                width: 'min(62vw, 300px)',
+                // Relative to the square preview, which is the captured region.
+                width: '58%',
                 aspectRatio: '3 / 4',
                 border: '3px dashed rgba(255,176,31,.85)',
                 borderRadius: '48% 48% 46% 46%',
@@ -196,6 +215,8 @@ export function CameraCapture({ onCapture, onClose }: Props) {
             }}
           />
         )}
+
+        </div>
 
         {error && (
           <div

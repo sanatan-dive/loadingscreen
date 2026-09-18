@@ -31,3 +31,17 @@ describe('healthz media check', () => {
     expect(await resolvable('assets/audio/themes/does-not-exist.mp3')).toBe(false)
   })
 })
+
+describe('healthz reports the limits in force', () => {
+  it('surfaces the free tier and ceiling so a deploy can be checked', async () => {
+    const { FREE_VIDEOS_PER_DAY, DAILY_CEILING_USD } = await import('@/lib/limits')
+    // Values come from env; the point is that they are readable at all.
+    expect(Number.isFinite(FREE_VIDEOS_PER_DAY)).toBe(true)
+    expect(Number.isFinite(DAILY_CEILING_USD)).toBe(true)
+    const src = await import('node:fs/promises').then((f) =>
+      f.readFile('app/api/healthz/route.ts', 'utf8')
+    )
+    expect(src).toMatch(/freeVideosPerDay/)
+    expect(src).toMatch(/dailyCeilingUsd/)
+  })
+})

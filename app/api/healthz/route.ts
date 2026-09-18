@@ -1,5 +1,6 @@
 import { runtimeInfo } from '@/lib/runtime'
 import { resolvable } from '@/lib/media-server'
+import { DAILY_CEILING_USD, FREE_VIDEOS_PER_DAY } from '@/lib/limits'
 import { listTemplates } from '@/lib/template'
 import { getStore } from '@/lib/store'
 
@@ -34,6 +35,11 @@ export async function GET() {
       ...(await runtimeInfo()),
       store: getStore().kind,
       missingMedia: missing,
+      // Policy, not secrets. Vercel stores env vars as secret type and will not
+      // read them back, so without this there is no way to confirm the limits a
+      // deployment is actually running under — only what you believe you set.
+      freeVideosPerDay: FREE_VIDEOS_PER_DAY,
+      dailyCeilingUsd: DAILY_CEILING_USD,
     }
     return Response.json(body, { status: body.ok ? 200 : 503 })
   } catch (err) {

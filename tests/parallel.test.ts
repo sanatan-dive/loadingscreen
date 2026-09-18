@@ -13,16 +13,12 @@ describe('shots are generated in parallel', () => {
   it('overlaps all three provider calls', async () => {
     const active: number[] = []
     let inFlight = 0
-    let firstStart = 0
-    let lastEnd = 0
 
     const edit = vi.fn(async ({ model }: any) => {
       inFlight++
       active.push(inFlight)
-      firstStart ||= Date.now()
       await new Promise((r) => setTimeout(r, SHOT_MS))
       inFlight--
-      lastEnd = Date.now()
       return {
         image: readFileSync('assets/templates/gta-redcarpet/shot_1.png'),
         model,
@@ -43,13 +39,21 @@ describe('shots are generated in parallel', () => {
       if (ev.type === 'error') throw new Error((ev as any).message)
     }
     expect(edit).toHaveBeenCalledTimes(3)
-    // The decisive assertion: at some moment, all three were in flight.
+    // The decisive assertion: at some moment, all three were in flight. Serial
+    // execution cannot produce this - inFlight would never exceed 1.
     expect(Math.max(...active)).toBe(3)
-    // The swap phase itself costs about one shot, not three. Measured from
-    // first call start to last call end, so it excludes embedding and the
-    // ffmpeg render.
-    const swapPhase = lastEnd - firstStart
-    expect(swapPhase).toBeLessThan(SHOT_MS * 2)
+    /*
+     * There was a wall-clock assertion here (swap phase < 2x one shot). It was
+     * removed because it measured the wrong thing and failed at random: the
+     * pipeline runs real ONNX decode/detect/embed on each result, which blocks
+     * the event loop between the fake timers, so the measured span drifted to
+     * 900-1600ms under load while the code was perfectly parallel. A test that
+     * goes red when nothing is broken trains you to ignore it.
+     *
+     * max(inFlight) === 3 proves concurrency directly and cannot be faked by a
+     * fast machine, so nothing was lost - verified by making generate() await
+     * each swap in turn, which takes this test red.
+     */
     expect(events.filter((e) => e === 'shot')).toHaveLength(3)
     expect(events.at(-1)).toBe('done')
   }, 60_000)
