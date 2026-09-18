@@ -157,7 +157,7 @@ export async function swapShot(
 
 export type PipelineEvent =
   | { type: 'shot'; index: number; shotId: string; image: Buffer; vsUser: number }
-  | { type: 'done'; video: string; costUsd: number; ms: number }
+  | { type: 'done'; video: string; costUsd: number; ms: number; shots: Buffer[] }
   | { type: 'error'; message: string; costUsd: number }
 
 export interface GenerateOptions {
@@ -225,5 +225,11 @@ export async function* generate(opts: GenerateOptions): AsyncGenerator<PipelineE
     silent: opts.silent ?? false,
   })
 
-  yield { type: 'done', video: out, costUsd: spent, ms: Date.now() - started }
+  yield {
+    type: 'done',
+    video: out,
+    costUsd: spent,
+    ms: Date.now() - started,
+    shots: done.map((d) => d.image!),
+  }
 }

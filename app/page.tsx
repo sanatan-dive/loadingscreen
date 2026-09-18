@@ -7,7 +7,7 @@ import { ShotStrip } from './components/ShotStrip'
 import { ThemeRail, type ThemeOption } from './components/ThemeRail'
 import { Pricedown, WantedStars, MoneyChip, MissionBanner, HudTag } from './components/Hud'
 import { toUserError } from '@/lib/user-error'
-import { Options } from './components/Options'
+import { CustomizeButton, OptionsDialog, countChanges } from './components/Options'
 import type { Appearance } from '@/lib/appearance'
 
 const THEMES: ThemeOption[] = [
@@ -29,6 +29,9 @@ export default function Page() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [theme, setTheme] = useState('gta-5')
   const [appearance, setAppearance] = useState<Appearance>({})
+  const [showOptions, setShowOptions] = useState(false)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [swapping, setSwapping] = useState(false)
   const [shots, setShots] = useState<(string | null)[]>([null, null, null])
   const [video, setVideo] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -80,6 +83,7 @@ export default function Page() {
             })
           } else if (ev.type === 'done') {
             setVideo(ev.src)
+            setJobId(ev.jobId ?? null)
             setPhase('done')
           } else if (ev.type === 'error') {
             setError(ev.message)
@@ -100,6 +104,41 @@ export default function Page() {
     run(f, theme, appearance)
   }
 
+  /**
+   * Switching music is a pure ffmpeg re-render of shots we already have — about
+   * a second, and no API spend. Only fall back to a full generate if the job
+   * has expired server-side.
+   */
+  const switchTheme = useCallback(
+    async (id: string) => {
+      setTheme(id)
+      if (!jobId) {
+        if (lastFile.current) run(lastFile.current, id, appearance)
+        return
+      }
+      setSwapping(true)
+      try {
+        const res = await fetch('/api/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId, themeId: id }),
+        })
+        if (res.status === 410) {
+          if (lastFile.current) run(lastFile.current, id, appearance)
+          return
+        }
+        const body = await res.json()
+        if (body.src) setVideo(body.src)
+        else setError(body.error ?? 'could not change the music')
+      } catch {
+        setError('could not change the music')
+      } finally {
+        setSwapping(false)
+      }
+    },
+    [jobId, appearance, run]
+  )
+
   const skewButton = (bg: string, fg = '#08080c'): React.CSSProperties => ({
     padding: '16px 34px',
     borderRadius: 3,
@@ -116,6 +155,14 @@ export default function Page() {
 
   return (
     <main style={{ position: 'relative', minHeight: '100dvh', zIndex: 1 }}>
+      {showOptions && (
+        <OptionsDialog
+          value={appearance}
+          onChange={setAppearance}
+          onClose={() => setShowOptions(false)}
+        />
+      )}
+
       <Stage
         state={stageState}
         src={video ?? '/reference.mp4'}
@@ -140,7 +187,22 @@ export default function Page() {
           pointerEvents: 'none',
         }}
       >
-        <WantedStars level={phase === 'done' ? 5 : phase === 'working' ? 3 : 1} />
+        <a
+          href="/"
+          aria-label="Cutscene home"
+          style={{ pointerEvents: 'auto', display: 'inline-flex', textDecoration: 'none' }}
+          onClick={(e) => {
+            // Reset in place rather than reloading and losing the result.
+            e.preventDefault()
+            setPhase('idle')
+            setVideo(null)
+            setJobId(null)
+            setShots([null, null, null])
+            setError(null)
+          }}
+        >
+          <WantedStars level={phase === 'done' ? 5 : phase === 'working' ? 3 : 1} />
+        </a>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, pointerEvents: 'auto' }}>
           <MoneyChip amount={phase === 'done' ? '$25,000' : '$0'} />
@@ -232,7 +294,7 @@ export default function Page() {
           {phase === 'idle' && (
             <>
               <UploadCard onFile={onFile} disabled={false} />
-              <Options value={appearance} onChange={setAppearance} />
+              <CustomizeButton onClick={() => setShowOptions(true)} count={countChanges(appearance)} />
             </>
           )}
 
@@ -268,13 +330,26 @@ export default function Page() {
                 </a>
                 <button
                   onClick={async () => {
-                    const blob = await (await fetch(video)).blob()
-                    const file = new File([blob], 'cutscene.mp4', { type: 'video/mp4' })
-                    if (navigator.canShare?.({ files: [file] })) {
-                      navigator.share({ files: [file], title: 'My cutscene' }).catch(() => {})
-                    } else {
-                      navigator.clipboard?.writeText(window.location.href)
+                    const text = 'I got on the loading screen 🎬'
+                    try {
+                      const blob = await (await fetch(video)).blob()
+                      const file = new File([blob], 'cutscene.mp4', { type: 'video/mp4' })
+                      if (navigator.canShare?.({ files: [file] })) {
+                        await navigator.share({ files: [file], text })
+                        return
+                      }
+                    } catch {
+                      // fall through to the X intent
                     }
+                    // X cannot accept a file from a web intent, so the video is
+                    // downloaded and the composer is opened pre-filled.
+                    const a = document.createElement('a')
+                    a.href = video
+                    a.download = 'cutscene.mp4'
+                    a.click()
+                    const url = new URL('https://x.com/intent/tweet')
+                    url.searchParams.set('text', `${text}\n${window.location.origin}`)
+                    window.open(url.toString(), '_blank', 'noopener,noreferrer')
                   }}
                   style={skewButton('var(--accent)')}
                 >
@@ -282,14 +357,7 @@ export default function Page() {
                 </button>
               </div>
 
-              <ThemeRail
-                themes={THEMES}
-                value={theme}
-                onChange={(id) => {
-                  setTheme(id)
-                  if (lastFile.current) run(lastFile.current, id, appearance)
-                }}
-              />
+              <ThemeRail themes={THEMES} value={theme} onChange={switchTheme} busy={swapping} />
 
               <button
                 onClick={() => {

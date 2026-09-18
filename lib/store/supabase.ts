@@ -63,4 +63,27 @@ export class SupabaseStore implements Store {
   async recordSpend(costUsd: number) {
     await this.db.from('spend_ledger').insert({ cost_usd: costUsd })
   }
+
+  private bucket = 'job-shots'
+
+  async putJobShots(jobId: string, shots: Buffer[]) {
+    await Promise.all(
+      shots.map((b, i) =>
+        this.db.storage.from(this.bucket).upload(`${jobId}/${i}.png`, b, {
+          contentType: 'image/png',
+          upsert: true,
+        })
+      )
+    )
+  }
+
+  async getJobShots(jobId: string): Promise<Buffer[] | null> {
+    const out: Buffer[] = []
+    for (let i = 0; i < 3; i++) {
+      const { data, error } = await this.db.storage.from(this.bucket).download(`${jobId}/${i}.png`)
+      if (error || !data) return null
+      out.push(Buffer.from(await data.arrayBuffer()))
+    }
+    return out
+  }
 }

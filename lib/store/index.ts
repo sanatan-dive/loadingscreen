@@ -16,6 +16,13 @@ export interface Store {
   /** null means the ledger could not be read — callers must fail closed. */
   spentToday(): Promise<number | null>
   recordSpend(costUsd: number): Promise<void>
+
+  /**
+   * Composited shots for a finished job, so switching the music re-renders
+   * without touching an image model.
+   */
+  putJobShots(jobId: string, shots: Buffer[]): Promise<void>
+  getJobShots(jobId: string): Promise<Buffer[] | null>
 }
 
 class MemoryStore implements Store {
@@ -49,6 +56,19 @@ class MemoryStore implements Store {
   }
   async recordSpend(cost: number) {
     this.ledger.push({ day: new Date().toISOString().slice(0, 10), cost })
+  }
+
+  private jobs = new Map<string, { shots: Buffer[]; at: number }>()
+
+  async putJobShots(jobId: string, shots: Buffer[]) {
+    // These are people's faces; keep them briefly and prune aggressively.
+    const cutoff = Date.now() - 30 * 60_000
+    for (const [k, v] of this.jobs) if (v.at < cutoff) this.jobs.delete(k)
+    this.jobs.set(jobId, { shots, at: Date.now() })
+  }
+
+  async getJobShots(jobId: string) {
+    return this.jobs.get(jobId)?.shots ?? null
   }
 }
 

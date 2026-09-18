@@ -7,6 +7,7 @@ import { checkSpendCeiling, take, LimitError } from '@/lib/limits'
 import { validateUpload } from '@/lib/limits/upload'
 import { toUserError } from '@/lib/user-error'
 import { parseAppearance } from '@/lib/appearance'
+import { randomUUID } from 'node:crypto'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -101,9 +102,13 @@ export async function POST(req: Request) {
             send({ type: 'shot', index: ev.index, src: await preview(ev.image), vsUser: ev.vsUser })
           } else if (ev.type === 'done') {
             await store.recordSpend(ev.costUsd)
+            // Keep the composited shots so switching music is a pure re-render.
+            const jobId = randomUUID()
+            await store.putJobShots(jobId, ev.shots)
             const mp4 = await readFile(ev.video)
             send({
               type: 'done',
+              jobId,
               src: `data:video/mp4;base64,${mp4.toString('base64')}`,
               costUsd: ev.costUsd,
               ms: ev.ms,
