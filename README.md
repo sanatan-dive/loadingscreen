@@ -132,18 +132,27 @@ a time.
 
 ### Deployment
 
-**Deploy with `npx vercel deploy --prod` from a machine that has the media.**
-`.vercelignore` replaces `.gitignore` for deploys, so the gitignored soundtracks
-and reference video upload from local disk while staying out of the public repo.
+Either the CLI or the GitHub integration works. The gitignored media is served
+from Supabase Storage, so a build from the repository is not missing it:
 
-Connecting Vercel's **GitHub integration instead would ship a broken product**:
-it builds from the repository, where the audio does not exist, and ffmpeg exits
-non-zero on a missing input — so every generation would pay for three face swaps,
-consume the user's free video and then fail. Serve the media from storage before
-enabling it.
+```bash
+npx tsx scripts/upload-media.ts    # once, and after changing any media
+```
 
-After any deploy, check `/api/healthz` for `ok:true` and a `ffmpegPath` that does
-not start with `/ROOT/`, then run one real generation.
+Then set **`NEXT_PUBLIC_MEDIA_BASE`** in the deployment's environment alongside
+`OPENROUTER_API_KEY`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Local disk
+always wins, so a checkout with the files present ignores all of this.
+
+**`next.config.ts` must keep `outputFileTracingIncludes` for the native
+binaries.** `onnxruntime-node` loads its binary with
+`require(\`../bin/napi-v6/${process.platform}/${process.arch}/...\`)` and sharp
+resolves `@img/sharp-<platform>-<arch>` the same way — runtime-computed paths no
+static tracer can follow. Without those entries the function ships with no
+native binaries and **every API route 500s on import**, while the build reports
+success and local development works perfectly.
+
+After any deploy, check `/api/healthz`: `ok:true`, an empty `missingMedia`, and
+a `ffmpegPath` that does not start with `/ROOT/`. Then run one real generation.
 
 Everything runs on Vercel. `next.config.ts` **must** keep the tracing
 exclusions: `onnxruntime-node` ships macOS, Windows and Linux binaries totalling

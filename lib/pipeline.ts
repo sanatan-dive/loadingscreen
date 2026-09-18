@@ -17,6 +17,7 @@ import { verify as realVerify, type GateResult } from '@/lib/gate'
 import { getTemplate, getTheme, type Shot, type Template } from '@/lib/template'
 import { appearanceDirectives, type Appearance } from '@/lib/appearance'
 import { render } from '@/lib/render'
+import { localFile } from '@/lib/media-server'
 
 export interface SwapDeps {
   edit: typeof realEdit
@@ -241,7 +242,7 @@ export async function* generate(opts: GenerateOptions): AsyncGenerator<PipelineE
     files.push(f)
   }
   const out = path.join(dir, 'cutscene.mp4')
-  await render(files as [string, string, string], theme.file, out, {
+  await render(files as [string, string, string], await localFile(theme.file), out, {
     cueStart: theme.cueStart,
     silent: opts.silent ?? false,
   })

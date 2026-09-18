@@ -4,6 +4,7 @@ import path from 'node:path'
 import { getStore } from '@/lib/store'
 import { getTemplate, getTheme } from '@/lib/template'
 import { render } from '@/lib/render'
+import { localFile } from '@/lib/media-server'
 import { toUserError } from '@/lib/user-error'
 
 export const runtime = 'nodejs'
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     const out = path.join(dir, 'cutscene.mp4')
 
     const started = Date.now()
-    await render(files as [string, string, string], theme.file, out, {
+    await render(files as [string, string, string], await localFile(theme.file), out, {
       cueStart: theme.cueStart,
       silent: silent === true,
     })

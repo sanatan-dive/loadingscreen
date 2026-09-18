@@ -9,11 +9,12 @@ import { Pricedown, WantedStars, MoneyChip, MissionBanner, HudTag } from './comp
 import { toUserError } from '@/lib/user-error'
 import { CustomizeButton, OptionsDialog, countChanges } from './components/Options'
 import type { Appearance } from '@/lib/appearance'
+import { publicUrl } from '@/lib/media'
 
 const THEMES: ThemeOption[] = [
-  { id: 'gta-sa', label: 'San Andreas', cue: '/cues/SA_b_hook.mp3' },
-  { id: 'gta-4', label: 'GTA IV', cue: '/cues/GTA4_b_hook.mp3' },
-  { id: 'gta-5', label: 'GTA V', cue: '/cues/GTA5_b_hook.mp3' },
+  { id: 'gta-sa', label: 'San Andreas', cue: publicUrl('/cues/SA_b_hook.mp3') },
+  { id: 'gta-4', label: 'GTA IV', cue: publicUrl('/cues/GTA4_b_hook.mp3') },
+  { id: 'gta-5', label: 'GTA V', cue: publicUrl('/cues/GTA5_b_hook.mp3') },
 ]
 
 type Phase = 'idle' | 'working' | 'done' | 'failed'
@@ -187,8 +188,8 @@ export default function Page() {
 
       <Stage
         state={stageState}
-        src={video ?? '/reference.mp4'}
-        poster="/reference-poster.jpg"
+        src={video ?? publicUrl('/reference.mp4')}
+        poster={publicUrl('/reference-poster.jpg')}
         controls={phase === 'done'}
       >
         {phase === 'working' && <ShotStrip shots={shots} />}

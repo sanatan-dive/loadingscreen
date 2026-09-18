@@ -1,3 +1,4 @@
+import { publicUrl } from '@/lib/media'
 import type { Metadata, Viewport } from 'next'
 import { Anton, Inter } from 'next/font/google'
 import './globals.css'
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Cutscene — get on the loading screen',
     description: 'Upload one photo. Get your own cinematic intro in about fifteen seconds.',
-    images: ['/reference-poster.jpg'],
+    images: [publicUrl('/reference-poster.jpg')],
   },
 }
 
