@@ -22,3 +22,5 @@ public/reference-poster.jpg
 
 # Incremental TypeScript build state.
 tsconfig.tsbuildinfo
+.vercel
+.env*
