@@ -5,6 +5,7 @@ import { getTemplate, getTheme } from '@/lib/template'
 import { getStore } from '@/lib/store'
 import { checkSpendCeiling, take, LimitError } from '@/lib/limits'
 import { validateUpload } from '@/lib/limits/upload'
+import { toUserError } from '@/lib/user-error'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -102,11 +103,16 @@ export async function POST(req: Request) {
             // A failed job still burned tokens upstream; record what was spent
             // so the ceiling stays honest, but never charge the user.
             if (ev.costUsd > 0) await store.recordSpend(ev.costUsd)
-            send({ type: 'error', message: ev.message })
+            const ue = toUserError(new Error(ev.message))
+            console.error('[generate] pipeline error:', ue.detail)
+            send({ type: 'error', message: ue.message })
           }
         }
       } catch (err) {
-        send({ type: 'error', message: err instanceof Error ? err.message : 'generation failed' })
+        const ue = toUserError(err)
+        // The user gets something actionable; we keep the trace.
+        console.error('[generate] failed:', ue.detail)
+        send({ type: 'error', message: ue.message })
       } finally {
         controller.close()
       }

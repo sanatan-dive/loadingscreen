@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { FFMPEG } from '@/lib/runtime'
+import { ffmpegPath } from '@/lib/runtime'
 import { TIMING } from '@/lib/template'
 import { buildFiltergraph } from './filtergraph'
 
@@ -44,7 +44,7 @@ export async function render(
   out: string,
   opts: RenderOptions
 ): Promise<void> {
-  await exec(FFMPEG, buildArgs(shots, audio, out, opts), { maxBuffer: 1 << 26 })
+  await exec(ffmpegPath(), buildArgs(shots, audio, out, opts), { maxBuffer: 1 << 26 })
 }
 
 export { buildFiltergraph }

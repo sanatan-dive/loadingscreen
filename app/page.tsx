@@ -6,6 +6,7 @@ import { UploadCard } from './components/UploadCard'
 import { ShotStrip } from './components/ShotStrip'
 import { ThemeRail, type ThemeOption } from './components/ThemeRail'
 import { Pricedown, WantedStars, MoneyChip, MissionBanner, HudTag } from './components/Hud'
+import { toUserError } from '@/lib/user-error'
 
 const THEMES: ThemeOption[] = [
   { id: 'gta-sa', label: 'San Andreas', cue: '/cues/SA_b_hook.mp3' },
@@ -83,7 +84,7 @@ export default function Page() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'something went wrong')
+      setError(toUserError(err).message)
       setPhase('failed')
     } finally {
       if (timer.current) clearInterval(timer.current)

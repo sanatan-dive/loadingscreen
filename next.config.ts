@@ -17,6 +17,13 @@ const config: NextConfig = {
     '/api/**': ['./models/**', './assets/**'],
   },
   agentRules: false,
+  /**
+   * These resolve native binaries with path.join(__dirname, ...). Next rewrites
+   * __dirname when it bundles a package, producing paths like
+   * "/ROOT/node_modules/ffmpeg-static/ffmpeg" that do not exist at runtime.
+   * Keeping them external leaves __dirname intact.
+   */
+  serverExternalPackages: ['ffmpeg-static', 'ffprobe-static', 'onnxruntime-node', 'sharp'],
   experimental: { serverActions: { bodySizeLimit: '12mb' } },
 }
 export default config

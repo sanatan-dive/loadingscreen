@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { extractImage, IntakeError, ACCEPTED_TYPES } from '@/lib/image-intake'
+import { CameraCapture } from './CameraCapture'
 
 interface Props {
   onFile: (file: File) => void
@@ -13,10 +14,21 @@ export function UploadCard({ onFile, disabled }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [mac, setMac] = useState(false)
+  const [camera, setCamera] = useState(false)
+  const [hasCamera, setHasCamera] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setMac(/Mac|iPhone|iPad/.test(navigator.platform))
+    // Only offer the camera where it can actually work — secure context,
+    // getUserMedia available, and a video input present.
+    const supported =
+      typeof navigator.mediaDevices?.getUserMedia === 'function' && window.isSecureContext
+    if (!supported) return
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((d) => setHasCamera(d.some((x) => x.kind === 'videoinput')))
+      .catch(() => setHasCamera(false))
   }, [])
 
   const accept = useCallback(
@@ -161,10 +173,54 @@ export function UploadCard({ onFile, disabled }: Props) {
         ref={inputRef}
         type="file"
         accept={ACCEPTED_TYPES.join(',')}
-        capture="user"
         hidden
         onChange={(e) => acceptFile(e.target.files?.[0])}
       />
+
+      {hasCamera && (
+        <button
+          onClick={() => setCamera(true)}
+          disabled={disabled}
+          style={{
+            width: '100%',
+            marginTop: 14,
+            padding: '13px 20px',
+            transform: 'skewX(-7deg)',
+            background: 'transparent',
+            border: '2px solid var(--line)',
+            borderRadius: 3,
+            color: 'var(--ink-soft)',
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            transition: 'all 180ms var(--ease)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--accent)'
+            e.currentTarget.style.color = 'var(--ink)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--line)'
+            e.currentTarget.style.color = 'var(--ink-soft)'
+          }}
+        >
+          <span style={{ display: 'inline-block', transform: 'skewX(7deg)' }}>
+            Or take a photo now
+          </span>
+        </button>
+      )}
+
+      {camera && (
+        <CameraCapture
+          onClose={() => setCamera(false)}
+          onCapture={(file) => {
+            setCamera(false)
+            setFlash('Got it')
+            onFile(file)
+          }}
+        />
+      )}
 
       {error && (
         <p
