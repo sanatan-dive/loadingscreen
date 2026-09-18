@@ -1,0 +1,17 @@
+EXPRESSION_PROMPT = (
+"You are performing a FACE REPLACEMENT edit. Two inputs:\n"
+"IMAGE A (first) = the scene. IMAGE B (second) = the identity to insert.\n"
+"\n"
+"Take from IMAGE B ONLY these: the facial bone structure, the skin tone, the hair, the beard, "
+"the eye colour - i.e. WHO the person is.\n"
+"\n"
+"Take from IMAGE A everything else, and this is critical: the EXACT FACIAL EXPRESSION. "
+"Copy the mouth shape exactly - if the man in IMAGE A is smiling, smirking, or showing teeth, "
+"the output MUST show that same smile with the same mouth opening and the same teeth visible. "
+"Copy the eye expression exactly - the same squint, the same eyebrow position, the same gaze direction. "
+"Copy the head angle and tilt exactly. Copy the clothing, the background, the lighting and the framing exactly.\n"
+"\n"
+"The result must look like the man from IMAGE B making the exact face that the man in IMAGE A is making. "
+"Do NOT give him a neutral or serious expression. Do NOT copy the expression from IMAGE B.\n"
+"Photorealistic, matching grain. No text."
+)
