@@ -7,15 +7,15 @@ const load = async (p: string) => decode(readFileSync(p))
 const oracle = (k: string) => Float32Array.from(golden[k].embedding)
 
 describe('identity', () => {
-  // The oracle detected at native resolution; we letterbox to the graph's
-  // static 640x640. A few px of disagreement is the scaling, not a bug.
+  // The oracle uses the same 640x640 letterbox, so agreement should be
+  // near-exact. A decode bug (wrong stride/prior) would be off by hundreds.
   for (const key of ['shot_1', 'shot_2', 'shot_3', 'user']) {
-    it(`finds one face in ${key}, agreeing with the oracle`, async () => {
+    it(`finds one face in ${key}, matching the oracle to within a pixel`, async () => {
       const g = golden[key]
       const faces = await detect(await load(g.path))
       expect(faces).toHaveLength(1)
       const [gx, gy, gw, gh] = g.faces[0]
-      const tol = gw * 0.08   // small images upscale into the 640 box, adding error
+      const tol = 1.0   // pixels
       expect(Math.abs(faces[0].x - gx)).toBeLessThan(tol)
       expect(Math.abs(faces[0].y - gy)).toBeLessThan(tol)
       expect(Math.abs(faces[0].w - gw)).toBeLessThan(tol)
@@ -34,14 +34,16 @@ describe('identity', () => {
     expect(cosine(a, b)).toBeLessThan(SAME)
   })
 
-  // The property that matters across implementations: our embedding of a
-  // person must resemble the oracle's embedding of THAT person far more than
-  // the oracle's embedding of anyone else.
+  // alignCrop differs slightly from OpenCV's (Umeyama least-squares vs
+  // estimateAffinePartial2D/RANSAC), so chips are not bit-identical. That is
+  // fine: production only ever compares our embeddings to our own. This test
+  // exists to catch the embedding space drifting, not to demand parity.
   it('agrees with the oracle on who is who', async () => {
     const ours = await embed(await load('tests/fixtures/user.png'))
     const same = cosine(ours, oracle('user'))
     const other = cosine(ours, oracle('shot_1'))
     expect(same).toBeGreaterThan(SAME)
+    expect(same).toBeGreaterThan(0.90)
     expect(same).toBeGreaterThan(other + 0.4)
   })
 
