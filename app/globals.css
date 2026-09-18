@@ -1,0 +1,105 @@
+/* Cutscene — Vice City palette.
+   Speed sits behind a black scrim; everything on top is pink, cyan and bone. */
+
+:root {
+  --bg: #08080c;
+  --bg-2: #101018;
+  --surface: #14141d;
+  --surface-2: #1c1c28;
+
+  --ink: #ffffff;
+  --ink-soft: #a8a8bb;
+  --ink-faint: #6e6e85;
+  --line: #2a2a3a;
+
+  --accent: #ffb01f;
+  --accent-hot: #ffd166;
+  --accent-deep: #a35c00;
+  --accent-soft: #2a1f08;
+
+  --cyan: #21e5ff;
+  --gold: #ffc13b;
+  --green: #8fd14f;
+
+  --r-sm: 3px;
+  --r-md: 6px;
+  --r-lg: 10px;
+
+  --shadow-hard: 8px 8px 0 #08080c;
+  --shadow-pink: 8px 8px 0 var(--accent);
+  --shadow-lift: 0 30px 70px rgba(0, 0, 0, 0.6);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --morph: 900ms;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* Neon bloom, top and bottom. Keeps flat black from reading as dead. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(62rem 36rem at 50% -12%, rgba(255, 176, 31, 0.16), transparent 64%),
+    radial-gradient(48rem 28rem at 88% 108%, rgba(255, 120, 0, 0.1), transparent 62%);
+}
+
+/* Scanline tint — very faint, adds the CRT/loading-screen feel. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.35;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.025) 0px,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: 0;
+  background: none;
+}
+
+:focus-visible {
+  outline: 2.5px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

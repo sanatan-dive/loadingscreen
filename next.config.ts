@@ -16,6 +16,7 @@ const config: NextConfig = {
   outputFileTracingIncludes: {
     '/api/**': ['./models/**', './assets/**'],
   },
+  agentRules: false,
   experimental: { serverActions: { bodySizeLimit: '12mb' } },
 }
 export default config

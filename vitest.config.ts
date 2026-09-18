@@ -5,10 +5,10 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   test: {
+    // Component tests opt into jsdom with a `@vitest-environment jsdom` docblock.
     environment: 'node',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
-    environmentMatchGlobs: [['tests/**/*.test.tsx', 'jsdom']],
     exclude: ['node_modules/**', 'spike/**', '.next/**'],
   },
 })
