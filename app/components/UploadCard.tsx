@@ -253,6 +253,24 @@ export function UploadCard({ onFile, disabled }: Props) {
       >
         Front-facing works best · deleted after
       </p>
+
+      {/* Consent, stated rather than checkboxed: a tick-to-continue in front of
+          a one-button product is the kind of setting this app exists to not
+          have, and uploading is the affirmative act. Set in sentence case
+          rather than the surrounding wide-tracked uppercase because it is a
+          sentence someone has to actually read, not a label to glance at. */}
+      <p
+        style={{
+          margin: '9px 2px 0',
+          fontSize: 12,
+          fontWeight: 600,
+          lineHeight: 1.5,
+          color: 'var(--ink-soft)',
+          textAlign: 'center',
+        }}
+      >
+        By uploading, you confirm it&rsquo;s you &mdash; or someone who agreed.
+      </p>
     </div>
   )
 }

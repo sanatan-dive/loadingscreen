@@ -40,7 +40,18 @@ export function take(
 }
 
 export class LimitError extends Error {
-  constructor(message: string, readonly status: number, readonly retryAfter = 0) {
+  /**
+   * What we had already spent when we decided to refuse. A guard that costs
+   * money to run must carry that cost out through the failure path too, or the
+   * ledger only ever sees the requests that succeeded — and the ceiling goes
+   * blind to exactly the abuse it exists to stop.
+   */
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly retryAfter = 0,
+    readonly costUsd = 0
+  ) {
     super(message)
     this.name = 'LimitError'
   }

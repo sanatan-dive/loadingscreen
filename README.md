@@ -3,9 +3,10 @@
 Upload one photo. Get a 15-second GTA-style cinematic intro with your face in it.
 
 ```
-photo ──► 3 parallel face swaps ──► identity gate ──► composite ──► ffmpeg ──► mp4
-                                         │
-                                         └── reject ──► escalate model ──► retry
+photo ──► guards ──► 3 parallel face swaps ──► identity gate ──► composite ──► ffmpeg ──► mp4
+             │                                      │
+             │                                      └── reject ──► escalate model ──► retry
+             └── one face? · under the day's limit? · not a public figure?  (all before a cent)
 ```
 
 ---
@@ -73,10 +74,11 @@ its own counters. Configure Supabase before taking real traffic.
 
 ```bash
 npm run dev         # local server
-npm test            # 78 tests
+npm test            # 151 tests
 npm run typecheck
 npm run build
 npx tsx scripts/e2e.ts <photo.jpg> out.mp4 gta-5   # real end-to-end, spends money
+npx tsx scripts/figure-check.ts <photo.png>        # public-figure verdict, ~$0.0007
 ```
 
 ---
@@ -94,6 +96,7 @@ Seven modules, each with one job and no knowledge of the others' internals.
 | `lib/composite` | head box, uniform scale+translate alignment (**never** a stretch), feathered elliptical blend |
 | `lib/render` | deterministic ffmpeg assembly. Same inputs, same bytes — which is what makes the render cache trustworthy |
 | `lib/store` | persistence behind one interface; Supabase or in-memory |
+| `lib/limits` | abuse and spend guards, all failing closed — upload validation, token buckets, the daily ceiling, and the public-figure screen |
 
 `lib/pipeline.ts` orchestrates: three swaps in parallel, each gated and
 escalated independently, emitted as they land so the UI can reveal them one at
@@ -144,8 +147,11 @@ keying shots on `(photo, template, shot, appearance)` and renders on
   MediaPipe FaceMesh or a VLM check before the gate can enforce it.
 - **Identity thresholds are calibrated on one face.** Validate across skin
   tones, ages, glasses, head coverings and facial hair before launch.
-- **No public-figure check.** Users will upload politicians and celebrities.
-  Specified in the design doc, not yet built. **Required before launch.**
+- **Public-figure false negatives.** The screen refuses only when two framings
+  of the photo name the same person, so a famous face the classifier names
+  inconsistently gets through. Deliberate: the alternative refuses real users.
+- **The screen is calibrated on few faces.** Measured against Musk, IShowSpeed
+  and two ordinary men. Validate more widely before launch.
 - **Video is returned as a data URL.** Fine locally; move to Supabase Storage
   before real traffic.
 - **No Turnstile yet.** The rate limiter is IP-based only.

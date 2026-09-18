@@ -9,8 +9,10 @@ import {
   LimitError,
   FREE_VIDEOS_PER_DAY,
   FREE_REFILL_PER_SEC,
+  type Bucket,
 } from '@/lib/limits'
 import { validateUpload } from '@/lib/limits/upload'
+import { screenForPublicFigure } from '@/lib/limits/figure'
 import { toUserError } from '@/lib/user-error'
 import { parseAppearance } from '@/lib/appearance'
 import { randomUUID } from 'node:crypto'
@@ -64,6 +66,10 @@ export async function POST(req: Request) {
   let parsed: ReturnType<typeof parseBody>
   let photo: Buffer
 
+  // Buckets as they were before this request, so a guard that fires after the
+  // token was taken can hand it back. Being refused must not cost a video.
+  const taken: { subject: string; before: Bucket }[] = []
+
   // ---- guards, all before a single cent is spent ----
   try {
     parsed = parseBody(await req.formData())
@@ -81,20 +87,38 @@ export async function POST(req: Request) {
         tokens: BUCKET_CAPACITY,
         updatedAt: Date.now(),
       }
-      const taken = take(existing, BUCKET_CAPACITY, BUCKET_REFILL_PER_SEC)
-      await store.putBucket(subject, taken.bucket)
-      if (!taken.ok) {
+      const result = take(existing, BUCKET_CAPACITY, BUCKET_REFILL_PER_SEC)
+      await store.putBucket(subject, result.bucket)
+      if (!result.ok) {
         throw new LimitError(
           `That is your ${FREE_VIDEOS_PER_DAY} free videos for today.`,
           429,
-          taken.retryAfter
+          result.retryAfter
         )
       }
+      taken.push({ subject, before: existing })
     }
+
+    // Famous faces are refused before any image spend. Runs after the token
+    // take so it cannot itself be hammered for free, and the token is refunded
+    // below if it refuses.
+    const screen = await screenForPublicFigure(photo)
+    // A refused attacker still costs us money; the ceiling must see it.
+    if (screen.costUsd > 0) await store.recordSpend(screen.costUsd)
 
     // Fails closed: a null reading refuses rather than spends.
     checkSpendCeiling(await store.spentToday())
   } catch (err) {
+    // Every guard past the take refuses the job, so none of them may keep the
+    // token: a public figure, a down classifier and our own ceiling are all
+    // our "no", not a video the user received.
+    for (const { subject, before } of taken) {
+      await store.putBucket(subject, before).catch(() => {})
+    }
+    // A guard that spent money before saying no still spent it.
+    if (err instanceof LimitError && err.costUsd > 0) {
+      await store.recordSpend(err.costUsd).catch(() => {})
+    }
     const status = err instanceof LimitError ? err.status : 400
     const message = err instanceof Error ? err.message : 'bad request'
     const headers: Record<string, string> = {}

@@ -137,3 +137,6 @@ export async function edit(req: EditRequest): Promise<EditResult> {
     release()
   }
 }
+
+export { classify, CLASSIFY_MODEL } from './classify'
+export type { FigureVerdict } from './classify'
