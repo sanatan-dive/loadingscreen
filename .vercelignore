@@ -1,0 +1,36 @@
+# What NOT to upload when deploying with `vercel deploy`.
+#
+# This file REPLACES .gitignore for deploys, which is the point: the GTA
+# soundtracks, the cue clips and the reference video are gitignored so they
+# never reach a public repo, but ffmpeg needs them at render time. Leaving
+# assets/ and public/ unlisted here means the CLI uploads them from local disk.
+#
+# Consequence, and it is not optional: this works for `vercel deploy` from a
+# machine that has the media. A deploy driven by the GitHub integration builds
+# from the repo, where the audio does not exist, and EVERY generation would pay
+# for three face swaps and then fail at the ffmpeg step. Connect the Git
+# integration only after the media is served from storage instead.
+
+.git
+.gitignore
+
+# Secrets. Vercel environment variables hold these; the file must never upload.
+.env
+.env.local
+.env.*.local
+
+node_modules
+.next
+.vercel
+
+# Debugging renders, the Python spike, the suite and the operator scripts: none
+# of it runs in production.
+out
+spike
+tests
+scripts
+docs
+
+tsconfig.tsbuildinfo
+*.log
+.DS_Store

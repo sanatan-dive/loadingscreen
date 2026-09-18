@@ -68,8 +68,11 @@ describe('upload validation', () => {
   })
 
   it('rejects a photo with more than one face', async () => {
-    // The 3-up comparison render contains three faces.
-    await expect(validateUpload(readFileSync('out/smile_v3.png'))).rejects.toThrow(/more than one face/i)
+    // A fixture built from the single-face photo tiled three times, so the
+    // suite does not depend on a debugging artifact to prove a guard.
+    await expect(validateUpload(readFileSync('tests/fixtures/three-faces.png'))).rejects.toThrow(
+      /more than one face/i
+    )
   })
 })
 

@@ -132,6 +132,19 @@ a time.
 
 ### Deployment
 
+**Deploy with `npx vercel deploy --prod` from a machine that has the media.**
+`.vercelignore` replaces `.gitignore` for deploys, so the gitignored soundtracks
+and reference video upload from local disk while staying out of the public repo.
+
+Connecting Vercel's **GitHub integration instead would ship a broken product**:
+it builds from the repository, where the audio does not exist, and ffmpeg exits
+non-zero on a missing input — so every generation would pay for three face swaps,
+consume the user's free video and then fail. Serve the media from storage before
+enabling it.
+
+After any deploy, check `/api/healthz` for `ok:true` and a `ffmpegPath` that does
+not start with `/ROOT/`, then run one real generation.
+
 Everything runs on Vercel. `next.config.ts` **must** keep the tracing
 exclusions: `onnxruntime-node` ships macOS, Windows and Linux binaries totalling
 294MB, which breaks the 250MB function limit. Excluding the non-Linux ones
@@ -191,6 +204,10 @@ keying shots on `(photo, template, shot, appearance)` and renders on
   uploads. The silent export mitigates this for users, not for us.
 - Buy a domain. `loadingscreen.com` was available and carries no trademark
   exposure; `gtaspeed.com` stacks two.
+
+`spike/` holds the throwaway Python prototype. It is kept because
+`spike/identity.py` is the oracle that produced `tests/fixtures/golden.json`,
+which is what proves the TypeScript CV port matches within 0.5px.
 
 See `docs/superpowers/specs/` for the design doc and `docs/superpowers/plans/`
 for the implementation plan.
