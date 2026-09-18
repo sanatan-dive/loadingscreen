@@ -1,24 +1,46 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { extractImage, IntakeError, ACCEPTED_TYPES } from '@/lib/image-intake'
 
 interface Props {
   onFile: (file: File) => void
   disabled?: boolean
 }
 
-const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp']
-
 export function UploadCard({ onFile, disabled }: Props) {
   const [over, setOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [flash, setFlash] = useState<string | null>(null)
+  const [mac, setMac] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    setMac(/Mac|iPhone|iPad/.test(navigator.platform))
+  }, [])
+
   const accept = useCallback(
+    async (dt: DataTransfer | null, source: 'paste' | 'drop') => {
+      setError(null)
+      try {
+        const file = await extractImage(dt)
+        if (!file) return
+        // Acknowledge before the flow takes over — otherwise a paste feels
+        // like nothing happened at all.
+        setFlash(source === 'paste' ? 'Pasted' : 'Got it')
+        onFile(file)
+      } catch (err) {
+        setError(err instanceof IntakeError ? err.message : 'Could not read that image.')
+      }
+    },
+    [onFile]
+  )
+
+  const acceptFile = useCallback(
     (file: File | undefined | null) => {
       setError(null)
       if (!file) return
-      if (!ACCEPTED.includes(file.type)) {
+      if (!(ACCEPTED_TYPES as readonly string[]).includes(file.type)) {
         setError('That needs to be a photo — PNG, JPEG or WebP.')
         return
       }
@@ -31,15 +53,22 @@ export function UploadCard({ onFile, disabled }: Props) {
     [onFile]
   )
 
-  // Paste-to-upload: faster than any file picker.
+  // Paste anywhere on the page. Ignored while a job runs, or a stray Cmd+V
+  // would kick off a second generation.
   useEffect(() => {
+    if (disabled) return
     const onPaste = (e: ClipboardEvent) => {
-      const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith('image/'))
-      if (item) accept(item.getAsFile())
+      void accept(e.clipboardData, 'paste')
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [accept])
+  }, [accept, disabled])
+
+  useEffect(() => {
+    if (!flash) return
+    const t = setTimeout(() => setFlash(null), 1400)
+    return () => clearTimeout(t)
+  }, [flash])
 
   return (
     <div style={{ width: '100%', maxWidth: 480 }}>
@@ -55,7 +84,7 @@ export function UploadCard({ onFile, disabled }: Props) {
         onDrop={(e) => {
           e.preventDefault()
           setOver(false)
-          accept(e.dataTransfer.files?.[0])
+          void accept(e.dataTransfer, 'drop')
         }}
         style={{
           width: '100%',
@@ -91,7 +120,7 @@ export function UploadCard({ onFile, disabled }: Props) {
               height="26"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#fff"
+              stroke="#08080c"
               strokeWidth="2.6"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -107,9 +136,11 @@ export function UploadCard({ onFile, disabled }: Props) {
               fontSize: 27,
               letterSpacing: '0.01em',
               textTransform: 'uppercase',
+              color: flash ? 'var(--accent)' : 'var(--ink)',
+              transition: 'color 200ms var(--ease)',
             }}
           >
-            Drop your photo in
+            {flash ?? 'Drop your photo in'}
           </div>
           <div
             style={{
@@ -121,7 +152,7 @@ export function UploadCard({ onFile, disabled }: Props) {
               color: 'var(--ink-soft)',
             }}
           >
-            or tap to choose · paste works
+            tap to choose · or paste with {mac ? '⌘V' : 'Ctrl+V'}
           </div>
         </div>
       </button>
@@ -129,10 +160,10 @@ export function UploadCard({ onFile, disabled }: Props) {
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPTED.join(',')}
+        accept={ACCEPTED_TYPES.join(',')}
         capture="user"
         hidden
-        onChange={(e) => accept(e.target.files?.[0])}
+        onChange={(e) => acceptFile(e.target.files?.[0])}
       />
 
       {error && (

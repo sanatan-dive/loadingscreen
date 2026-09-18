@@ -224,7 +224,7 @@ export default function Page() {
             }}
           />
 
-          {phase === 'idle' && <UploadCard onFile={onFile} />}
+          {phase === 'idle' && <UploadCard onFile={onFile} disabled={false} />}
 
           {/* ---------------- working ---------------- */}
           {phase === 'working' && (
