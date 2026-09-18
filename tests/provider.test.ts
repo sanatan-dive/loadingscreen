@@ -19,10 +19,12 @@ afterEach(() => {
 describe('model ladder', () => {
   it('puts flash-lite first - fastest, cheapest AND most accurate', () => {
     expect(MODEL_LADDER[0]).toBe('google/gemini-3.1-flash-lite-image')
-    expect(MODEL_LADDER).toHaveLength(3)
+    expect(MODEL_LADDER).toHaveLength(2)
   })
-  it('does not include the model that failed identity in every trial', () => {
+  it('excludes models that failed identity or are strictly dominated', () => {
     expect(MODEL_LADDER).not.toContain('google/gemini-2.5-flash-image')
+    // slower AND pricier AND less accurate than flash-lite
+    expect(MODEL_LADDER).not.toContain('google/gemini-3.1-flash-image')
   })
 })
 

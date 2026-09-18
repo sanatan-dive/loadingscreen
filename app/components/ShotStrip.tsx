@@ -20,8 +20,8 @@ export function ShotStrip({ shots }: Props) {
         gridTemplateColumns: 'repeat(3, 1fr)',
         gap: 10,
         padding: 10,
-        background: 'rgba(10,10,12,.55)',
-        backdropFilter: 'blur(14px)',
+        background: 'rgba(8,8,12,.88)',
+        backdropFilter: 'blur(18px)',
       }}
     >
       {shots.map((src, i) => (
@@ -32,7 +32,8 @@ export function ShotStrip({ shots }: Props) {
             position: 'relative',
             borderRadius: 14,
             overflow: 'hidden',
-            background: 'rgba(255,255,255,.09)',
+            background: 'rgba(255,255,255,.05)',
+            border: src ? '2px solid var(--accent)' : '2px dashed rgba(255,176,31,.35)',
           }}
         >
           {src ? (
@@ -47,16 +48,32 @@ export function ShotStrip({ shots }: Props) {
               }}
             />
           ) : (
+            <>
+              <span
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'grid',
+                  placeItems: 'center',
+                  zIndex: 1,
+                  fontFamily: 'var(--font-display), Impact, sans-serif',
+                  fontSize: 34,
+                  color: 'rgba(255,176,31,.30)',
+                }}
+              >
+                {i + 1}
+              </span>
             <div
               style={{
                 position: 'absolute',
                 inset: 0,
                 background:
-                  'linear-gradient(100deg, rgba(255,255,255,.04) 30%, rgba(255,255,255,.16) 50%, rgba(255,255,255,.04) 70%)',
+                  'linear-gradient(100deg, rgba(255,176,31,.04) 30%, rgba(255,176,31,.22) 50%, rgba(255,176,31,.04) 70%)',
                 backgroundSize: '220% 100%',
                 animation: 'shimmer 1.5s linear infinite',
               }}
             />
+            </>
           )}
         </div>
       ))}

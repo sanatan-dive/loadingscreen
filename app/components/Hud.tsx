@@ -47,7 +47,7 @@ export function Pricedown({
     >
       <span
         style={{
-          background: TONES[tone],
+          backgroundImage: TONES[tone],
           WebkitBackgroundClip: 'text',
           backgroundClip: 'text',
           color: 'transparent',

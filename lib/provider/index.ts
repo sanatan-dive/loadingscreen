@@ -13,13 +13,18 @@ export interface EditResult {
 }
 
 /**
- * Cheapest first, and that is not a compromise: in benchmarking, flash-lite
- * was the fastest (10.2s), the cheapest ($0.0342) AND the most accurate
- * (0.804 identity) of the four candidates.
+ * Two rungs, not three. Measured on the same crop and face:
+ *
+ *   flash-lite   10.2s  $0.0342  identity 0.804   <- default
+ *   flash-image  13.0s  $0.0684  identity 0.640   <- strictly dominated, omitted
+ *   pro-image    26.6s  $0.1405  identity 0.799   <- fallback
+ *
+ * flash-image is slower AND pricier AND less accurate than flash-lite, so it
+ * only ever added latency and spend. Dropping it caps the worst case around
+ * 36s instead of 50s.
  */
 export const MODEL_LADDER = [
   'google/gemini-3.1-flash-lite-image',
-  'google/gemini-3.1-flash-image',
   'google/gemini-3-pro-image',
 ] as const
 

@@ -9,7 +9,7 @@ const fakeImage = async () =>
   (await import('node:fs/promises')).readFile('assets/templates/gta-redcarpet/shot_1.png')
 
 describe('swapShot escalation', () => {
-  it('climbs the ladder when the gate rejects, cheapest first', async () => {
+  it('climbs the ladder when the gate rejects', async () => {
     const tried: string[] = []
     const edit = vi.fn(async ({ model }: any) => {
       tried.push(model)
@@ -28,11 +28,10 @@ describe('swapShot escalation', () => {
     )
     expect(tried).toEqual([
       'google/gemini-3.1-flash-lite-image',
-      'google/gemini-3.1-flash-image',
       'google/gemini-3-pro-image',
     ])
-    expect(r.ok).toBe(true)
-    expect(r.attempts).toBe(3)
+    expect(r.ok).toBe(false)   // only two rungs; the third verdict never runs
+    expect(r.attempts).toBe(2)
   }, 30_000)
 
   it('stops at the first model when it passes - no wasted spend', async () => {
@@ -48,7 +47,7 @@ describe('swapShot escalation', () => {
     expect(r.costUsd).toBeCloseTo(0.0342)
   }, 30_000)
 
-  it('gives up after three attempts and does NOT charge', async () => {
+  it('gives up after exhausting the ladder and does NOT charge', async () => {
     const edit = vi.fn(async ({ model }: any) => ({
       image: await fakeImage(), model, ms: 1, costUsd: 0.0342,
     }))
@@ -59,7 +58,7 @@ describe('swapShot escalation', () => {
     )
     expect(r.ok).toBe(false)
     expect(r.charged).toBe(false)
-    expect(edit).toHaveBeenCalledTimes(3)
+    expect(edit).toHaveBeenCalledTimes(2)
   }, 30_000)
 
   it('survives a provider throwing and still escalates', async () => {
