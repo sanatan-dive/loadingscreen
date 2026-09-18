@@ -49,6 +49,9 @@ export default function Page() {
   const [theme, setTheme] = useState('gta-5')
   const [appearance, setAppearance] = useState<Appearance>({})
   const [showOptions, setShowOptions] = useState(false)
+  // Sound on by default. Stage falls back to silent if the browser refuses
+  // audible autoplay, and switches on at the first click.
+  const [heroMuted, setHeroMuted] = useState(false)
   const [jobId, setJobId] = useState<string | null>(null)
   const [swapping, setSwapping] = useState(false)
   const [shots, setShots] = useState<(string | null)[]>([null, null, null])
@@ -191,6 +194,7 @@ export default function Page() {
         src={video ?? publicUrl('/reference.mp4')}
         poster={publicUrl('/reference-poster.jpg')}
         controls={phase === 'done'}
+        heroMuted={heroMuted}
       >
         {phase === 'working' && <ShotStrip shots={shots} />}
       </Stage>
@@ -228,6 +232,37 @@ export default function Page() {
         </a>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, pointerEvents: 'auto' }}>
+          {phase === 'idle' && (
+            <button
+              onClick={() => setHeroMuted((m) => !m)}
+              aria-label={heroMuted ? 'Turn sound on' : 'Turn sound off'}
+              aria-pressed={!heroMuted}
+              title={heroMuted ? 'Sound on' : 'Sound off'}
+              style={{
+                width: 34,
+                height: 34,
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: 999,
+                border: '2px solid var(--accent)',
+                background: heroMuted ? 'rgba(20,20,29,.72)' : 'var(--accent)',
+                color: heroMuted ? 'var(--accent)' : '#08080c',
+                backdropFilter: 'blur(8px)',
+                cursor: 'pointer',
+                flex: '0 0 auto',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M11 5 6 9H2v6h4l5 4V5z" />
+                {heroMuted ? (
+                  <><path d="m23 9-6 6" /><path d="m17 9 6 6" /></>
+                ) : (
+                  <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                )}
+              </svg>
+            </button>
+          )}
           <MoneyChip amount={phase === 'done' ? '$25,000' : '$0'} />
           <a
             href="https://buymeacoffee.com/sanatan"

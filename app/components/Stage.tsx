@@ -16,6 +16,13 @@ interface Props {
   src: string
   poster?: string
   controls?: boolean
+  /**
+   * Whether the reference clip is silent. Owned by the page, not here: in hero
+   * state this element is scaled to cover the viewport, so its own corners are
+   * off-screen and a control inside it cannot be seen. `position: fixed` does
+   * not escape either — a transformed ancestor becomes the containing block.
+   */
+  heroMuted?: boolean
   children?: React.ReactNode
 }
 
@@ -42,22 +49,74 @@ function useScales() {
   return scales
 }
 
-export function Stage({ state, src, poster, controls = false, children }: Props) {
+/** Background ambience, not a performance. The user's own cutscene plays at 0.8. */
+const HERO_VOLUME = 0.35
+
+export function Stage({ state, src, poster, controls = false, heroMuted = true, children }: Props) {
   const scales = useScales()
   const videoRef = useRef<HTMLVideoElement>(null)
   const scale = scales[state]
+
+  /**
+   * Set when the browser refused to autoplay with sound. Sound is ON by intent,
+   * but autoplay policy is not something code can opt out of: calling play() on
+   * an unmuted element throws NotAllowedError and NOTHING plays, so the hero
+   * would go black. We therefore try audible first, drop to silent if refused,
+   * and switch on at the first gesture — by which point the browser allows it.
+   */
+  const [blocked, setBlocked] = useState(false)
 
   // Reload when the source swaps from the reference to the user's cutscene.
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
     v.load()
-    // Loud enough to feel cinematic, short of startling anyone.
-    v.volume = 0.8
-  }, [src])
+    v.volume = controls ? 0.8 : HERO_VOLUME
+  }, [src, controls])
+
+  // Try to start audible; fall back to silent and wait for a gesture.
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v || controls || heroMuted) return
+
+    let cancelled = false
+    v.muted = false
+    v.volume = HERO_VOLUME
+    v.play().catch(() => {
+      if (cancelled) return
+      setBlocked(true)
+      v.muted = true
+      void v.play().catch(() => {})
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [src, controls, heroMuted])
+
+  // The first gesture anywhere lifts the block. Once only, and passive.
+  useEffect(() => {
+    if (!blocked) return
+    const unblock = () => {
+      const v = videoRef.current
+      setBlocked(false)
+      if (v) {
+        v.muted = false
+        v.volume = HERO_VOLUME
+        void v.play().catch(() => {})
+      }
+    }
+    const opts = { once: true, passive: true } as const
+    window.addEventListener('pointerdown', unblock, opts)
+    window.addEventListener('keydown', unblock, opts)
+    return () => {
+      window.removeEventListener('pointerdown', unblock)
+      window.removeEventListener('keydown', unblock)
+    }
+  }, [blocked])
 
   useEffect(() => {
-    if (videoRef.current) videoRef.current.volume = 0.8
+    if (videoRef.current) videoRef.current.volume = controls ? 0.8 : HERO_VOLUME
   }, [controls])
 
   return (
@@ -89,7 +148,7 @@ export function Stage({ state, src, poster, controls = false, children }: Props)
         ref={videoRef}
         poster={poster}
         autoPlay
-        muted={!controls}
+        muted={controls ? false : heroMuted || blocked}
         loop
         playsInline
         controls={controls}
