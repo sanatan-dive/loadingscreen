@@ -70,6 +70,16 @@ Without Supabase the app runs fully but the cache and rate limits are
 per-process, which is fine locally and wrong on serverless — each instance gets
 its own counters. Configure Supabase before taking real traffic.
 
+Supabase also needs a **private storage bucket named `job-shots`**, which holds
+the composited shots so switching the music is a re-render rather than three
+fresh face swaps. `scripts/store-check.ts` creates it if it is missing and
+round-trips every table the request path touches; run it after changing either
+Supabase variable.
+
+A *wrong* service-role key is worse than none: `spentToday()` returns null, and
+because the ceiling fails closed that refuses every generation. Verify with
+`store-check` rather than by loading the page.
+
 ### Scripts
 
 ```bash
@@ -79,6 +89,7 @@ npm run typecheck
 npm run build
 npx tsx scripts/e2e.ts <photo.jpg> out.mp4 gta-5   # real end-to-end, spends money
 npx tsx scripts/figure-check.ts <photo.png>        # public-figure verdict, ~$0.0007
+npx tsx scripts/store-check.ts                     # prove the persistent store is wired
 ```
 
 ---
