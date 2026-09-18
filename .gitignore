@@ -1,5 +1,6 @@
 .env
 .env.local
+.env.vercel
 node_modules/
 .next/
 # Scratch renders and A/B comparisons from the composite scripts. Useful while
