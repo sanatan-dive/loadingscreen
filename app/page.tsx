@@ -18,6 +18,24 @@ const THEMES: ThemeOption[] = [
 
 type Phase = 'idle' | 'working' | 'done' | 'failed'
 
+/**
+ * Stable per-browser id, paired with the IP check so one shared network does
+ * not consume everyone's free videos. Best-effort: private windows and cleared
+ * storage fall back to the IP limit alone.
+ */
+function clientId(): string {
+  try {
+    let id = localStorage.getItem('cutscene:client')
+    if (!id) {
+      id = crypto.randomUUID()
+      localStorage.setItem('cutscene:client', id)
+    }
+    return id
+  } catch {
+    return ''
+  }
+}
+
 const LOADING_LINES = [
   'Stealing your face',
   'Adjusting the jacket',
@@ -58,7 +76,11 @@ export default function Page() {
     form.set('appearance', JSON.stringify(look))
 
     try {
-      const res = await fetch('/api/generate', { method: 'POST', body: form })
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        body: form,
+        headers: { 'x-cutscene-client': clientId() },
+      })
       if (!res.ok || !res.body) {
         throw new Error((await res.json().catch(() => ({}))).error ?? 'request failed')
       }
@@ -216,16 +238,16 @@ export default function Page() {
               background: 'var(--gold)',
               color: '#08080c',
               padding: '7px 13px',
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 800,
-              letterSpacing: '0.13em',
+              letterSpacing: '0.1em',
               textTransform: 'uppercase',
               textDecoration: 'none',
               boxShadow: '3px 3px 0 #08080c',
             }}
           >
             <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
-              Buy me a coffee
+              Help me recover my domain cost
             </span>
           </a>
         </div>

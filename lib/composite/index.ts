@@ -1,7 +1,9 @@
 import { similarityTransform, type Face, type RawImage } from '@/lib/identity'
 import { featherMask, type OpenEdges } from './mask'
+import { borderStats, matchColour } from './colour'
 
 export { featherMask }
+export { borderStats, matchColour }
 export type { OpenEdges }
 
 export interface Box {
@@ -57,20 +59,64 @@ export function blend(
   const bw = box.x1 - box.x0
   const bh = box.y1 - box.y0
   const t = similarityTransform(srcFace, dstFace)
+
+  // 1. Resample the generated head into box space.
+  const aligned = new Uint8Array(bw * bh * 3)
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const sx = Math.round((x - t.tx) / t.scale)
+      const sy = Math.round((y - t.ty) / t.scale)
+      const di = (y * bw + x) * 3
+      if (sx < 0 || sy < 0 || sx >= head.width || sy >= head.height) {
+        // Outside the generated image: fall back to the original pixel so the
+        // colour statistics are not skewed by black.
+        const fi = ((box.y0 + y) * frame.width + (box.x0 + x)) * 3
+        aligned[di] = frame.bgr[fi]
+        aligned[di + 1] = frame.bgr[fi + 1]
+        aligned[di + 2] = frame.bgr[fi + 2]
+        continue
+      }
+      const si = (sy * head.width + sx) * 3
+      aligned[di] = head.bgr[si]
+      aligned[di + 1] = head.bgr[si + 1]
+      aligned[di + 2] = head.bgr[si + 2]
+    }
+  }
+
+  // 2. Match exposure and white balance using the border ring, where the two
+  //    images must agree. Without this the whole box reads as a lighter
+  //    rectangle no matter how soft the edge is.
+  const original: RawImage = {
+    bgr: (() => {
+      const c = new Uint8Array(bw * bh * 3)
+      for (let y = 0; y < bh; y++) {
+        const src = ((box.y0 + y) * frame.width + box.x0) * 3
+        c.set(frame.bgr.subarray(src, src + bw * 3), y * bw * 3)
+      }
+      return c
+    })(),
+    width: bw,
+    height: bh,
+  }
+  const band = Math.max(8, Math.round(Math.min(bw, bh) * 0.08))
+  const alignedImg: RawImage = { bgr: aligned, width: bw, height: bh }
+  const corrected = matchColour(
+    alignedImg,
+    borderStats(alignedImg, band),
+    borderStats(original, band)
+  )
+
+  // 3. Blend with the mask.
   const mask = featherMask(bw, bh, openEdges(box, frame.width, frame.height))
   const out = Uint8Array.from(frame.bgr)
-
   for (let y = 0; y < bh; y++) {
     for (let x = 0; x < bw; x++) {
       const a = mask[y * bw + x]
       if (a <= 0) continue
-      const sx = Math.round((x - t.tx) / t.scale)
-      const sy = Math.round((y - t.ty) / t.scale)
-      if (sx < 0 || sy < 0 || sx >= head.width || sy >= head.height) continue
       const di = ((box.y0 + y) * frame.width + (box.x0 + x)) * 3
-      const si = (sy * head.width + sx) * 3
+      const si = (y * bw + x) * 3
       for (let c = 0; c < 3; c++) {
-        out[di + c] = Math.round(head.bgr[si + c] * a + frame.bgr[di + c] * (1 - a))
+        out[di + c] = Math.round(corrected.bgr[si + c] * a + frame.bgr[di + c] * (1 - a))
       }
     }
   }

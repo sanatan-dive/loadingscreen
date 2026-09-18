@@ -5,6 +5,8 @@
 
 export const DAILY_CEILING_USD = Number(process.env.DAILY_CEILING_USD ?? 25)
 export const FREE_VIDEOS_PER_DAY = Number(process.env.FREE_VIDEOS_PER_DAY ?? 3)
+/** Tokens refill across a full day, so three really means three per day. */
+export const FREE_REFILL_PER_SEC = FREE_VIDEOS_PER_DAY / 86_400
 /** Measured: 2 shots at flash-lite + 1 escalation to pro is a realistic worst case. */
 export const ESTIMATED_JOB_USD = 0.21
 

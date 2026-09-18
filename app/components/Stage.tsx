@@ -49,8 +49,16 @@ export function Stage({ state, src, poster, controls = false, children }: Props)
 
   // Reload when the source swaps from the reference to the user's cutscene.
   useEffect(() => {
-    videoRef.current?.load()
+    const v = videoRef.current
+    if (!v) return
+    v.load()
+    // Loud enough to feel cinematic, short of startling anyone.
+    v.volume = 0.8
   }, [src])
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.volume = 0.8
+  }, [controls])
 
   return (
     <div

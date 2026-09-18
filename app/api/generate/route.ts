@@ -3,7 +3,13 @@ import sharp from 'sharp'
 import { generate } from '@/lib/pipeline'
 import { getTemplate, getTheme } from '@/lib/template'
 import { getStore } from '@/lib/store'
-import { checkSpendCeiling, take, LimitError } from '@/lib/limits'
+import {
+  checkSpendCeiling,
+  take,
+  LimitError,
+  FREE_VIDEOS_PER_DAY,
+  FREE_REFILL_PER_SEC,
+} from '@/lib/limits'
 import { validateUpload } from '@/lib/limits/upload'
 import { toUserError } from '@/lib/user-error'
 import { parseAppearance } from '@/lib/appearance'
@@ -12,9 +18,13 @@ import { randomUUID } from 'node:crypto'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-/** Per-IP: 5 videos burst, refilling one every two minutes. */
-const BUCKET_CAPACITY = 5
-const BUCKET_REFILL_PER_SEC = 1 / 120
+/**
+ * Free tier: three generations per day, counted against BOTH the IP and a
+ * per-browser id. A shared network should not spend one person's allowance,
+ * and clearing a cookie should not hand out three more.
+ */
+const BUCKET_CAPACITY = FREE_VIDEOS_PER_DAY
+const BUCKET_REFILL_PER_SEC = FREE_REFILL_PER_SEC
 
 /** Previews cross the wire per shot; keep them small. */
 async function preview(png: Buffer): Promise<string> {
@@ -61,15 +71,25 @@ export async function POST(req: Request) {
 
     await validateUpload(photo)
 
-    const subject = `ip:${clientIp(req)}`
-    const existing = (await store.getBucket(subject)) ?? {
-      tokens: BUCKET_CAPACITY,
-      updatedAt: Date.now(),
-    }
-    const taken = take(existing, BUCKET_CAPACITY, BUCKET_REFILL_PER_SEC)
-    await store.putBucket(subject, taken.bucket)
-    if (!taken.ok) {
-      throw new LimitError('slow down a moment — try again shortly', 429, taken.retryAfter)
+    // Charge both subjects; refuse if either is exhausted.
+    const browserId = (req.headers.get('x-cutscene-client') ?? '').slice(0, 64)
+    const subjects = [`ip:${clientIp(req)}`]
+    if (/^[a-zA-Z0-9-]{8,64}$/.test(browserId)) subjects.push(`browser:${browserId}`)
+
+    for (const subject of subjects) {
+      const existing = (await store.getBucket(subject)) ?? {
+        tokens: BUCKET_CAPACITY,
+        updatedAt: Date.now(),
+      }
+      const taken = take(existing, BUCKET_CAPACITY, BUCKET_REFILL_PER_SEC)
+      await store.putBucket(subject, taken.bucket)
+      if (!taken.ok) {
+        throw new LimitError(
+          `That is your ${FREE_VIDEOS_PER_DAY} free videos for today.`,
+          429,
+          taken.retryAfter
+        )
+      }
     }
 
     // Fails closed: a null reading refuses rather than spends.

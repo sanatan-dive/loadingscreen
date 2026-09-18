@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { refill, take, checkSpendCeiling, LimitError, DAILY_CEILING_USD } from '@/lib/limits'
+import {
+  refill,
+  take,
+  checkSpendCeiling,
+  LimitError,
+  DAILY_CEILING_USD,
+  FREE_VIDEOS_PER_DAY,
+  FREE_REFILL_PER_SEC,
+} from '@/lib/limits'
 import { sniff, validateUpload, MAX_UPLOAD_BYTES } from '@/lib/limits/upload'
 
 describe('token bucket', () => {
@@ -62,5 +70,32 @@ describe('upload validation', () => {
   it('rejects a photo with more than one face', async () => {
     // The 3-up comparison render contains three faces.
     await expect(validateUpload(readFileSync('out/smile_v3.png'))).rejects.toThrow(/more than one face/i)
+  })
+})
+
+describe('free tier: three per day', () => {
+  it('allows exactly three then refuses', () => {
+    const now = 1_000_000
+    let bucket = { tokens: FREE_VIDEOS_PER_DAY, updatedAt: now }
+    for (let i = 0; i < FREE_VIDEOS_PER_DAY; i++) {
+      const r = take(bucket, FREE_VIDEOS_PER_DAY, FREE_REFILL_PER_SEC, 1, now)
+      expect(r.ok, `generation ${i + 1}`).toBe(true)
+      bucket = r.bucket
+    }
+    expect(take(bucket, FREE_VIDEOS_PER_DAY, FREE_REFILL_PER_SEC, 1, now).ok).toBe(false)
+  })
+
+  it('does not hand out a fourth a minute later', () => {
+    const now = 1_000_000
+    const spent = { tokens: 0, updatedAt: now }
+    expect(take(spent, FREE_VIDEOS_PER_DAY, FREE_REFILL_PER_SEC, 1, now + 60_000).ok).toBe(false)
+  })
+
+  it('refills the full allowance after a day', () => {
+    const now = 1_000_000
+    const spent = { tokens: 0, updatedAt: now }
+    const r = take(spent, FREE_VIDEOS_PER_DAY, FREE_REFILL_PER_SEC, 1, now + 86_400_000)
+    expect(r.ok).toBe(true)
+    expect(r.bucket.tokens).toBeCloseTo(FREE_VIDEOS_PER_DAY - 1, 1)
   })
 })
