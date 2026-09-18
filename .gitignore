@@ -6,3 +6,13 @@ out/*.mp4
 /tmp/
 .DS_Store
 spike/models/*.onnx
+
+# Third-party media. The GTA soundtracks, the cue clips cut from them, and the
+# reference video are other people's copyrighted work — they stay out of a
+# public repo. Supply them locally; see README "Media you must supply".
+assets/audio/
+assets/reference_audio.m4a
+public/cues/
+public/reference.mp4
+public/reference.webm
+public/reference-poster.jpg

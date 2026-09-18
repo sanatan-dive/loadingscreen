@@ -80,6 +80,23 @@ A *wrong* service-role key is worse than none: `spentToday()` returns null, and
 because the ceiling fails closed that refuses every generation. Verify with
 `store-check` rather than by loading the page.
 
+### Media you must supply
+
+The repository deliberately ships **no audio and no reference video**. The three
+GTA soundtracks, the cue clips cut from them and the reference clip are other
+people's copyrighted work, so they are gitignored rather than published here.
+A clone renders nothing until you provide your own:
+
+| path | what it is |
+|---|---|
+| `assets/audio/themes/gta-{sa,4,5}.mp3` | full theme per `lib/template`, any length |
+| `public/cues/{SA,GTA4,GTA5}_b_hook.mp3` | ~15s preview clip played by the theme rail |
+| `public/reference.mp4` · `.webm` · `reference-poster.jpg` | the example shown on the landing page |
+
+Normalize the themes to -14 LUFS / -1.5 dBTP or the theme switcher feels broken:
+the sources differ by ~4dB. Point `lib/template` at whatever you use — it is
+data, so substituting royalty-free music is a one-line change per theme.
+
 ### Scripts
 
 ```bash
