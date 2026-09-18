@@ -2,11 +2,18 @@ import { readFile, unlink } from 'node:fs/promises'
 import sharp from 'sharp'
 import { generate } from '@/lib/pipeline'
 import { getTemplate, getTheme } from '@/lib/template'
+import { getStore } from '@/lib/store'
+import { checkSpendCeiling, take, LimitError } from '@/lib/limits'
+import { validateUpload } from '@/lib/limits/upload'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-/** Previews go down the wire many times; keep them small. */
+/** Per-IP: 5 videos burst, refilling one every two minutes. */
+const BUCKET_CAPACITY = 5
+const BUCKET_REFILL_PER_SEC = 1 / 120
+
+/** Previews cross the wire per shot; keep them small. */
 async function preview(png: Buffer): Promise<string> {
   const jpeg = await sharp(png).resize(420).jpeg({ quality: 72 }).toBuffer()
   return `data:image/jpeg;base64,${jpeg.toString('base64')}`
@@ -18,8 +25,7 @@ export function parseBody(form: FormData) {
   const themeId = String(form.get('themeId') ?? '')
   const silent = String(form.get('silent') ?? '') === 'true'
 
-  if (!(photo instanceof File)) throw new Error('photo is required')
-  if (photo.size > 10 * 1024 * 1024) throw new Error('photo is too large')
+  if (!(photo instanceof File)) throw new LimitError('photo is required', 400)
 
   const template = getTemplate(templateId)
   getTheme(template, themeId) // throws on an unknown theme
@@ -27,17 +33,47 @@ export function parseBody(form: FormData) {
   return { photo, templateId, themeId, silent }
 }
 
+function clientIp(req: Request): string {
+  const fwd = req.headers.get('x-forwarded-for')
+  return fwd?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
+}
+
 export async function POST(req: Request) {
+  const store = getStore()
   let parsed: ReturnType<typeof parseBody>
+  let photo: Buffer
+
+  // ---- guards, all before a single cent is spent ----
   try {
     parsed = parseBody(await req.formData())
+    photo = Buffer.from(await parsed.photo.arrayBuffer())
+
+    await validateUpload(photo)
+
+    const subject = `ip:${clientIp(req)}`
+    const existing = (await store.getBucket(subject)) ?? {
+      tokens: BUCKET_CAPACITY,
+      updatedAt: Date.now(),
+    }
+    const taken = take(existing, BUCKET_CAPACITY, BUCKET_REFILL_PER_SEC)
+    await store.putBucket(subject, taken.bucket)
+    if (!taken.ok) {
+      throw new LimitError('slow down a moment — try again shortly', 429, taken.retryAfter)
+    }
+
+    // Fails closed: a null reading refuses rather than spends.
+    checkSpendCeiling(await store.spentToday())
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : 'bad request' }, { status: 400 })
+    const status = err instanceof LimitError ? err.status : 400
+    const message = err instanceof Error ? err.message : 'bad request'
+    const headers: Record<string, string> = {}
+    if (err instanceof LimitError && err.retryAfter) {
+      headers['Retry-After'] = String(err.retryAfter)
+    }
+    return Response.json({ error: message }, { status, headers })
   }
 
-  const photo = Buffer.from(await parsed.photo.arrayBuffer())
   const encoder = new TextEncoder()
-
   const stream = new ReadableStream({
     async start(controller) {
       const send = (e: unknown) =>
@@ -53,6 +89,7 @@ export async function POST(req: Request) {
           if (ev.type === 'shot') {
             send({ type: 'shot', index: ev.index, src: await preview(ev.image), vsUser: ev.vsUser })
           } else if (ev.type === 'done') {
+            await store.recordSpend(ev.costUsd)
             const mp4 = await readFile(ev.video)
             send({
               type: 'done',
@@ -62,6 +99,9 @@ export async function POST(req: Request) {
             })
             unlink(ev.video).catch(() => {})
           } else {
+            // A failed job still burned tokens upstream; record what was spent
+            // so the ceiling stays honest, but never charge the user.
+            if (ev.costUsd > 0) await store.recordSpend(ev.costUsd)
             send({ type: 'error', message: ev.message })
           }
         }
