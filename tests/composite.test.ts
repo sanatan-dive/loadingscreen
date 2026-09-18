@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { headBox, featherMask } from '@/lib/composite'
+import { headBox, featherMask, openEdges } from '@/lib/composite'
 import type { Face } from '@/lib/identity'
 
 const face: Face = { x: 300, y: 100, w: 200, h: 200, landmarks: [], score: 0.99 }
@@ -47,11 +47,28 @@ describe('featherMask', () => {
     }
   })
 
-  it('feathers only at the crop boundary', () => {
+  it('feathers interior edges', () => {
     expect(at(0, Math.round(h / 2))).toBe(0)
     expect(at(w - 1, Math.round(h / 2))).toBe(0)
     expect(at(Math.round(w / 2), 0)).toBe(0)
     expect(at(Math.round(w / 2), h - 1)).toBe(0)
+  })
+
+  // The head box is routinely clamped to the top of the frame. Feathering
+  // there faded generated hair into original hair across the topmost rows and
+  // produced a flat-topped head.
+  it('stays opaque on an edge clamped to the frame boundary', () => {
+    const clamped = featherMask(w, h, { top: false, right: true, bottom: true, left: true })
+    const atC = (x: number, y: number) => clamped[y * w + x]
+    expect(atC(Math.round(w / 2), 0)).toBe(1)
+    expect(atC(Math.round(w / 2), 5)).toBe(1)
+    // other edges still feather
+    expect(atC(0, Math.round(h / 2))).toBe(0)
+  })
+
+  it('is fully opaque when every edge is clamped', () => {
+    const none = featherMask(40, 40, { top: false, right: false, bottom: false, left: false })
+    expect(none.every((v) => v === 1)).toBe(true)
   })
 
   it('rises monotonically inward from the edge', () => {
@@ -69,5 +86,26 @@ describe('featherMask', () => {
       expect(v).toBeGreaterThanOrEqual(0)
       expect(v).toBeLessThanOrEqual(1)
     }
+  })
+})
+
+describe('openEdges', () => {
+  it('marks a box clamped to the frame top as closed', () => {
+    const e = openEdges({ x0: 10, y0: 0, x1: 500, y1: 400 }, 960, 720)
+    expect(e.top).toBe(false)
+    expect(e.left).toBe(true)
+    expect(e.bottom).toBe(true)
+  })
+
+  it('marks a fully interior box as open on all sides', () => {
+    expect(openEdges({ x0: 10, y0: 10, x1: 500, y1: 400 }, 960, 720)).toEqual({
+      top: true, left: true, right: true, bottom: true,
+    })
+  })
+
+  it('handles a box clamped on every side', () => {
+    expect(openEdges({ x0: 0, y0: 0, x1: 960, y1: 720 }, 960, 720)).toEqual({
+      top: false, left: false, right: false, bottom: false,
+    })
   })
 })

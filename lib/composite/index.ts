@@ -1,7 +1,8 @@
 import { similarityTransform, type Face, type RawImage } from '@/lib/identity'
-import { featherMask } from './mask'
+import { featherMask, type OpenEdges } from './mask'
 
 export { featherMask }
+export type { OpenEdges }
 
 export interface Box {
   x0: number
@@ -33,6 +34,19 @@ export function headBox(f: Face, imgW: number, imgH: number): Box {
  * roughly 2:3 whatever the input aspect, and stretching to fit visibly
  * distorts the head.
  */
+/**
+ * Which box edges sit inside the frame. An edge clamped to the frame boundary
+ * has nothing outside it to blend into, so it must not be feathered.
+ */
+export function openEdges(box: Box, frameW: number, frameH: number): OpenEdges {
+  return {
+    top: box.y0 > 0,
+    left: box.x0 > 0,
+    right: box.x1 < frameW,
+    bottom: box.y1 < frameH,
+  }
+}
+
 export function blend(
   frame: RawImage,
   head: RawImage,
@@ -43,7 +57,7 @@ export function blend(
   const bw = box.x1 - box.x0
   const bh = box.y1 - box.y0
   const t = similarityTransform(srcFace, dstFace)
-  const mask = featherMask(bw, bh)
+  const mask = featherMask(bw, bh, openEdges(box, frame.width, frame.height))
   const out = Uint8Array.from(frame.bgr)
 
   for (let y = 0; y < bh; y++) {
