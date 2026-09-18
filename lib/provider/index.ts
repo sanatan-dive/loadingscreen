@@ -5,6 +5,8 @@ export interface EditRequest {
   expression: string
   /** Extra directives from the user's appearance choices. Usually empty. */
   directives?: string[]
+  /** Abandons the call when the job it belongs to has already failed. */
+  signal?: AbortSignal
 }
 
 export interface EditResult {
@@ -96,6 +98,7 @@ export async function edit(req: EditRequest): Promise<EditResult> {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       const res = await fetch(ENDPOINT, {
         method: 'POST',
+        signal: req.signal,
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: req.model,
@@ -115,6 +118,7 @@ export async function edit(req: EditRequest): Promise<EditResult> {
 
       if (res.status === 429 || res.status >= 500) {
         await sleep(2 ** attempt * 500 + Math.random() * 300)
+        if (req.signal?.aborted) throw new ProviderError('abandoned', false)
         continue
       }
       if (!res.ok) {

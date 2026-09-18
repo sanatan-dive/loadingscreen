@@ -71,6 +71,8 @@ export interface SwapInput {
   facePng: Buffer
   userEmbedding: Float32Array | null
   appearance?: Appearance
+  /** Set once any shot has failed: the job is lost, stop buying frames for it. */
+  signal?: AbortSignal
 }
 
 export interface SwapOutput {
@@ -100,6 +102,12 @@ export async function swapShot(
   let lastReason = 'no attempts made'
 
   for (const model of MODEL_LADDER) {
+    // The job this shot belongs to has already failed. Climbing to the next
+    // rung would buy a $0.14 frame for a video that will never be rendered.
+    if (input.signal?.aborted) {
+      lastReason = 'abandoned after another shot failed'
+      break
+    }
     attempts++
     let result: Awaited<ReturnType<typeof realEdit>>
     try {
@@ -109,6 +117,7 @@ export async function swapShot(
         model,
         expression: input.shot.expression,
         directives: appearanceDirectives(input.appearance),
+        signal: input.signal,
       })
     } catch (err) {
       lastReason = err instanceof Error ? err.message : String(err)
@@ -187,8 +196,12 @@ export async function* generate(opts: GenerateOptions): AsyncGenerator<PipelineE
   }
 
   const facePng = await encodePng(userImage)
+  const abort = new AbortController()
   const results = template.shots.map((shot) =>
-    swapShot({ shot, facePng, userEmbedding, appearance: opts.appearance }, opts.deps ?? defaultDeps)
+    swapShot(
+      { shot, facePng, userEmbedding, appearance: opts.appearance, signal: abort.signal },
+      opts.deps ?? defaultDeps
+    )
   )
 
   // Emit each shot the moment it resolves, not in template order.
@@ -202,6 +215,14 @@ export async function* generate(opts: GenerateOptions): AsyncGenerator<PipelineE
     done[i] = r
     spent += r.costUsd
     if (!r.ok) {
+      // One shot failing loses the whole video, so stop the other two before
+      // they escalate. Then wait for whatever is already in flight and count
+      // it: money committed before we gave up is money the daily ceiling has
+      // to see, even though the user is never charged for it.
+      abort.abort()
+      for (const settled of await Promise.allSettled(pending.values())) {
+        if (settled.status === 'fulfilled') spent += settled.value.r.costUsd
+      }
       yield {
         type: 'error',
         message: `couldn't place your face in shot ${i + 1}: ${r.reason}`,
