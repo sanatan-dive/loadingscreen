@@ -55,9 +55,9 @@ export function ThemeRail({ themes, value, onChange, busy }: Props) {
               gap: 9,
               padding: '10px 14px 10px 11px',
               borderRadius: 999,
-              background: active ? 'var(--ink)' : 'var(--surface)',
-              color: active ? '#fff' : 'var(--ink)',
-              border: `1.5px solid ${active ? 'var(--ink)' : 'var(--line)'}`,
+              background: active ? 'var(--accent)' : 'var(--surface)',
+              color: active ? '#08080c' : 'var(--ink)',
+              border: `1.5px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
               boxShadow: active ? 'var(--shadow-md)' : 'var(--shadow-sm)',
               fontSize: 14.5,
               fontWeight: 600,
@@ -75,7 +75,7 @@ export function ThemeRail({ themes, value, onChange, busy }: Props) {
                 borderRadius: 999,
                 display: 'grid',
                 placeItems: 'center',
-                background: active ? 'rgba(255,255,255,.18)' : 'var(--bg-warm)',
+                background: active ? 'rgba(8,8,12,.20)' : 'var(--surface-2)',
               }}
             >
               {playing === t.id ? (

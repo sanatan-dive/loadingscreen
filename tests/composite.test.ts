@@ -28,30 +28,46 @@ describe('headBox', () => {
 })
 
 describe('featherMask', () => {
-  const w = 100, h = 100
+  const w = 200, h = 260
   const m = featherMask(w, h)
+  const at = (x: number, y: number) => m[y * w + x]
 
-  it('is opaque at the centre', () => {
-    expect(m[Math.round(h * 0.46) * w + 50]).toBeGreaterThan(0.95)
+  it('is fully opaque across the centre', () => {
+    expect(at(w / 2, h / 2)).toBe(1)
   })
 
-  it('is transparent at the corners so there is no visible seam', () => {
-    expect(m[0]).toBeLessThan(0.05)
-    expect(m[w - 1]).toBeLessThan(0.05)
-    expect(m[(h - 1) * w]).toBeLessThan(0.05)
+  // The forehead sits in the upper third. The old elliptical mask cut across
+  // it, cross-fading generated hair into original hair and smearing the
+  // hairline. That whole region must now come wholly from the generated head.
+  it('is fully opaque across the forehead and hairline', () => {
+    for (const fy of [0.16, 0.22, 0.3, 0.38]) {
+      for (const fx of [0.3, 0.5, 0.7]) {
+        expect(at(Math.round(w * fx), Math.round(h * fy)), `x=${fx} y=${fy}`).toBe(1)
+      }
+    }
   })
 
-  it('falls off monotonically from centre to edge', () => {
-    const row = Math.round(h * 0.46)
-    const centre = m[row * w + 50]
-    const mid = m[row * w + 75]
-    const edge = m[row * w + 99]
-    expect(centre).toBeGreaterThanOrEqual(mid)
-    expect(mid).toBeGreaterThanOrEqual(edge)
+  it('feathers only at the crop boundary', () => {
+    expect(at(0, Math.round(h / 2))).toBe(0)
+    expect(at(w - 1, Math.round(h / 2))).toBe(0)
+    expect(at(Math.round(w / 2), 0)).toBe(0)
+    expect(at(Math.round(w / 2), h - 1)).toBe(0)
+  })
+
+  it('rises monotonically inward from the edge', () => {
+    const y = Math.round(h / 2)
+    let prev = -1
+    for (let x = 0; x < 30; x++) {
+      const v = at(x, y)
+      expect(v).toBeGreaterThanOrEqual(prev)
+      prev = v
+    }
   })
 
   it('stays within [0,1]', () => {
-    for (const v of m) expect(v).toBeGreaterThanOrEqual(0)
-    for (const v of m) expect(v).toBeLessThanOrEqual(1)
+    for (const v of m) {
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
   })
 })

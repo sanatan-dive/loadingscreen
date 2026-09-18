@@ -15,6 +15,7 @@ import { blend, headBox, type Box } from '@/lib/composite'
 import { edit as realEdit, MODEL_LADDER } from '@/lib/provider'
 import { verify as realVerify, type GateResult } from '@/lib/gate'
 import { getTemplate, getTheme, type Shot, type Template } from '@/lib/template'
+import { appearanceDirectives, type Appearance } from '@/lib/appearance'
 import { render } from '@/lib/render'
 
 export interface SwapDeps {
@@ -69,6 +70,7 @@ export interface SwapInput {
   shot: Shot
   facePng: Buffer
   userEmbedding: Float32Array | null
+  appearance?: Appearance
 }
 
 export interface SwapOutput {
@@ -106,6 +108,7 @@ export async function swapShot(
         face: input.facePng,
         model,
         expression: input.shot.expression,
+        directives: appearanceDirectives(input.appearance),
       })
     } catch (err) {
       lastReason = err instanceof Error ? err.message : String(err)
@@ -162,6 +165,7 @@ export interface GenerateOptions {
   templateId: string
   themeId: string
   silent?: boolean
+  appearance?: Appearance
   deps?: SwapDeps
 }
 
@@ -184,7 +188,7 @@ export async function* generate(opts: GenerateOptions): AsyncGenerator<PipelineE
 
   const facePng = await encodePng(userImage)
   const results = template.shots.map((shot) =>
-    swapShot({ shot, facePng, userEmbedding }, opts.deps ?? defaultDeps)
+    swapShot({ shot, facePng, userEmbedding, appearance: opts.appearance }, opts.deps ?? defaultDeps)
   )
 
   // Emit each shot the moment it resolves, not in template order.

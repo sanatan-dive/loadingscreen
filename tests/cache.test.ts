@@ -13,8 +13,15 @@ describe('cache keys', () => {
     expect(shotKey(base)).toBe(shotKey({ ...base }))
   })
 
+  it('is unchanged by default appearance choices', () => {
+    // "keep"/"match" mean no prompt directive, so they must not fragment the
+    // cache — otherwise every default render misses.
+    expect(shotKey({ ...base, appearance: { hair: 'keep', outfit: 'keep', skin: 'match' } }))
+      .toBe(shotKey(base))
+  })
+
   it('changes when appearance changes', () => {
-    expect(shotKey(base)).not.toBe(shotKey({ ...base, appearance: { skinTone: 'lighter' } }))
+    expect(shotKey(base)).not.toBe(shotKey({ ...base, appearance: { skin: 'lighter' as const } }))
   })
 
   it('differs per shot', () => {

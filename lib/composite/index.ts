@@ -1,4 +1,7 @@
 import { similarityTransform, type Face, type RawImage } from '@/lib/identity'
+import { featherMask } from './mask'
+
+export { featherMask }
 
 export interface Box {
   x0: number
@@ -21,24 +24,6 @@ export function headBox(f: Face, imgW: number, imgH: number): Box {
     x1: Math.min(imgW, Math.round(cx + f.w * PAD_X)),
     y1: Math.min(imgH, Math.round(cy + f.h * PAD_DOWN)),
   }
-}
-
-/** Feathered ellipse, centred slightly high so hair is favoured over collar. */
-export function featherMask(w: number, h: number, inset = 0.05, blur = 0.18): Float32Array {
-  const m = new Float32Array(w * h)
-  const cx = w / 2
-  const cy = h * 0.46
-  const ax = w * (0.5 - inset)
-  const ay = h * (0.5 - inset)
-  const feather = Math.max(w, h) * blur
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const d = Math.hypot((x - cx) / ax, (y - cy) / ay)
-      const px = (1 - d) * Math.min(ax, ay)
-      m[y * w + x] = Math.max(0, Math.min(1, px / feather))
-    }
-  }
-  return m
 }
 
 /**

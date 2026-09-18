@@ -2,17 +2,9 @@ import { createHash } from 'node:crypto'
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex')
 
-export interface Appearance {
-  skinTone?: string
-  hair?: string
-}
+import { appearanceKey, type Appearance } from '@/lib/appearance'
 
-function appearanceKey(a: Appearance): string {
-  return Object.keys(a)
-    .sort()
-    .map((k) => `${k}=${(a as Record<string, string | undefined>)[k]}`)
-    .join('&')
-}
+export type { Appearance }
 
 /**
  * Keyed WITHOUT the theme, so switching music never re-swaps a face.

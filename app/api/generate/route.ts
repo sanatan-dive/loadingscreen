@@ -6,6 +6,7 @@ import { getStore } from '@/lib/store'
 import { checkSpendCeiling, take, LimitError } from '@/lib/limits'
 import { validateUpload } from '@/lib/limits/upload'
 import { toUserError } from '@/lib/user-error'
+import { parseAppearance } from '@/lib/appearance'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -26,12 +27,20 @@ export function parseBody(form: FormData) {
   const themeId = String(form.get('themeId') ?? '')
   const silent = String(form.get('silent') ?? '') === 'true'
 
+  // Allow-listed: these values become prompt text.
+  let appearance = {}
+  try {
+    appearance = parseAppearance(JSON.parse(String(form.get('appearance') ?? '{}')))
+  } catch {
+    appearance = {}
+  }
+
   if (!(photo instanceof File)) throw new LimitError('photo is required', 400)
 
   const template = getTemplate(templateId)
   getTheme(template, themeId) // throws on an unknown theme
 
-  return { photo, templateId, themeId, silent }
+  return { photo, templateId, themeId, silent, appearance }
 }
 
 function clientIp(req: Request): string {
@@ -86,6 +95,7 @@ export async function POST(req: Request) {
           templateId: parsed.templateId,
           themeId: parsed.themeId,
           silent: parsed.silent,
+          appearance: parsed.appearance,
         })) {
           if (ev.type === 'shot') {
             send({ type: 'shot', index: ev.index, src: await preview(ev.image), vsUser: ev.vsUser })

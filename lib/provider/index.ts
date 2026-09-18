@@ -3,6 +3,8 @@ export interface EditRequest {
   face: Buffer
   model: string
   expression: string
+  /** Extra directives from the user's appearance choices. Usually empty. */
+  directives?: string[]
 }
 
 export interface EditResult {
@@ -52,7 +54,7 @@ function release(): void {
  * reference image for expression drags its bone structure and skin tone
  * across, so we describe the expression in words instead.
  */
-export function buildPrompt(expression: string): string {
+export function buildPrompt(expression: string, directives: string[] = []): string {
   return [
     'You are performing a FACE REPLACEMENT edit. Two inputs:',
     'IMAGE A (first) = the scene. IMAGE B (second) = the identity to insert.',
@@ -67,6 +69,9 @@ export function buildPrompt(expression: string): string {
     '',
     'Keep from IMAGE A only: the clothing, the background, the head angle, the lighting direction,',
     'the framing.',
+    // Only present when the user asked for a change; silence is the default.
+    ...(directives.length ? ['', 'Then apply these changes:', ...directives.map((d) => `- ${d}.`)] : []),
+    '',
     'Photorealistic, matching grain. No text.',
   ].join('\n')
 }
@@ -99,7 +104,7 @@ export async function edit(req: EditRequest): Promise<EditResult> {
             {
               role: 'user',
               content: [
-                { type: 'text', text: buildPrompt(req.expression) },
+                { type: 'text', text: buildPrompt(req.expression, req.directives) },
                 { type: 'image_url', image_url: { url: dataUrl(req.crop) } },
                 { type: 'image_url', image_url: { url: dataUrl(req.face) } },
               ],

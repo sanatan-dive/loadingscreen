@@ -7,6 +7,8 @@ import { ShotStrip } from './components/ShotStrip'
 import { ThemeRail, type ThemeOption } from './components/ThemeRail'
 import { Pricedown, WantedStars, MoneyChip, MissionBanner, HudTag } from './components/Hud'
 import { toUserError } from '@/lib/user-error'
+import { Options } from './components/Options'
+import type { Appearance } from '@/lib/appearance'
 
 const THEMES: ThemeOption[] = [
   { id: 'gta-sa', label: 'San Andreas', cue: '/cues/SA_b_hook.mp3' },
@@ -26,6 +28,7 @@ const LOADING_LINES = [
 export default function Page() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [theme, setTheme] = useState('gta-5')
+  const [appearance, setAppearance] = useState<Appearance>({})
   const [shots, setShots] = useState<(string | null)[]>([null, null, null])
   const [video, setVideo] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -36,7 +39,7 @@ export default function Page() {
   const stageState: StageState = phase === 'idle' ? 'hero' : phase === 'done' ? 'result' : 'card'
   const landed = shots.filter(Boolean).length
 
-  const run = useCallback(async (file: File, themeId: string) => {
+  const run = useCallback(async (file: File, themeId: string, look: Appearance) => {
     setPhase('working')
     setError(null)
     setShots([null, null, null])
@@ -49,6 +52,7 @@ export default function Page() {
     form.set('photo', file)
     form.set('templateId', 'gta-redcarpet')
     form.set('themeId', themeId)
+    form.set('appearance', JSON.stringify(look))
 
     try {
       const res = await fetch('/api/generate', { method: 'POST', body: form })
@@ -93,7 +97,7 @@ export default function Page() {
 
   const onFile = (f: File) => {
     lastFile.current = f
-    run(f, theme)
+    run(f, theme, appearance)
   }
 
   const skewButton = (bg: string, fg = '#08080c'): React.CSSProperties => ({
@@ -225,7 +229,12 @@ export default function Page() {
             }}
           />
 
-          {phase === 'idle' && <UploadCard onFile={onFile} disabled={false} />}
+          {phase === 'idle' && (
+            <>
+              <UploadCard onFile={onFile} disabled={false} />
+              <Options value={appearance} onChange={setAppearance} />
+            </>
+          )}
 
           {/* ---------------- working ---------------- */}
           {phase === 'working' && (
@@ -278,7 +287,7 @@ export default function Page() {
                 value={theme}
                 onChange={(id) => {
                   setTheme(id)
-                  if (lastFile.current) run(lastFile.current, id)
+                  if (lastFile.current) run(lastFile.current, id, appearance)
                 }}
               />
 
