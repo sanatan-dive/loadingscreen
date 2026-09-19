@@ -11,6 +11,8 @@ import {
   FREE_REFILL_PER_SEC,
 } from '@/lib/limits'
 import { validateUpload } from '@/lib/limits/upload'
+import { sameOrigin, withinBodyLimit } from '@/lib/limits/request'
+import { screenForBot } from '@/lib/limits/bot'
 import { screenForPublicFigure } from '@/lib/limits/figure'
 import { toUserError } from '@/lib/user-error'
 import { parseAppearance } from '@/lib/appearance'
@@ -140,10 +142,17 @@ export async function POST(req: Request) {
 
   // ---- guards, all before a single cent is spent ----
   try {
-    parsed = parseBody(await req.formData())
-    photo = Buffer.from(await parsed.photo.arrayBuffer())
-
-    await validateUpload(photo)
+    // Nothing above has read the body yet, and nothing below this line runs for
+    // a request that is already over its allowance. Order matters more than it
+    // looks: validateUpload decodes the image and runs face detection, which is
+    // the most expensive thing this route does before the provider, and it used
+    // to run BEFORE the token take - so a flood from one address paid for a
+    // full decode and detect on every request it was going to be refused for.
+    sameOrigin(req)
+    withinBodyLimit(req)
+    // Before the token take: a script must not be able to drain the allowance
+    // of the address it is pretending to be.
+    await screenForBot()
 
     // Charge every subject; refuse if ANY of them is exhausted. Three signals
     // because each one alone leaks: the IP rotates on mobile, localStorage
@@ -173,6 +182,13 @@ export async function POST(req: Request) {
       }
       charged.push(subject)
     }
+
+    // Past the allowance check: now the body is worth reading. Anything that
+    // throws from here on refunds in the catch below, so a photo we reject
+    // still costs the user nothing.
+    parsed = parseBody(await req.formData())
+    photo = Buffer.from(await parsed.photo.arrayBuffer())
+    await validateUpload(photo)
 
     // Famous faces are refused before any image spend. Runs after the token
     // take so it cannot itself be hammered for free, and the token is refunded

@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { withBotId } from 'botid/next/config'
 
 const config: NextConfig = {
   // onnxruntime-node ships darwin + win32 + linux binaries (294MB total).
@@ -36,6 +37,44 @@ const config: NextConfig = {
   },
   agentRules: false,
   /**
+   * Nobody else gets to host this product inside their own page: an iframe of
+   * it is someone else's traffic spending our credits under our name, and it is
+   * how a "free GTA intro" ends up wrapped in an ad farm.
+   *
+   * `camera=(self)` is load-bearing — the upload card can take a photo, and a
+   * blanket camera=() silently breaks that.
+   *
+   * withBotId() appends its own header rule for the path its challenge is
+   * served from, which relaxes the framing headers back to 'self' there. That
+   * only works because it appends AFTER these: do not move this below it.
+   */
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+          },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()',
+          },
+        ],
+      },
+      {
+        // A generated video is one person's face. It must never be cached by a
+        // shared proxy and handed to the next caller.
+        source: '/api/:path*',
+        headers: [{ key: 'Cache-Control', value: 'no-store, max-age=0' }],
+      },
+    ]
+  },
+  /**
    * These resolve native binaries with path.join(__dirname, ...). Next rewrites
    * __dirname when it bundles a package, producing paths like
    * "/ROOT/node_modules/ffmpeg-static/ffmpeg" that do not exist at runtime.
@@ -44,4 +83,9 @@ const config: NextConfig = {
   serverExternalPackages: ['ffmpeg-static', 'ffprobe-static', 'onnxruntime-node', 'sharp'],
   experimental: { serverActions: { bodySizeLimit: '12mb' } },
 }
-export default config
+/**
+ * BotID adds the same-origin rewrites its challenge script is served from.
+ * Serving it first-party is the point: a third-party script path is the first
+ * thing an ad blocker (and a determined script) drops.
+ */
+export default withBotId(config)

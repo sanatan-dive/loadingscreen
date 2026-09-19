@@ -6,9 +6,26 @@ import { getTemplate, getTheme } from '@/lib/template'
 import { render } from '@/lib/render'
 import { localFile } from '@/lib/media-server'
 import { toUserError } from '@/lib/user-error'
+import { take, LimitError } from '@/lib/limits'
+import { sameOrigin } from '@/lib/limits/request'
+import { screenForBot } from '@/lib/limits/bot'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
+
+/**
+ * A re-render spends no API credit, but it does spend an ffmpeg run and a
+ * function invocation, and neither the free-video allowance nor the daily
+ * spend ceiling can see it. Thirty an hour is far more than auditioning three
+ * songs needs and far less than a loop wants.
+ */
+const RENDER_PER_HOUR = 30
+const RENDER_REFILL_PER_SEC = RENDER_PER_HOUR / 3600
+
+function clientIp(req: Request): string {
+  const fwd = req.headers.get('x-forwarded-for')
+  return fwd?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
+}
 
 /**
  * Re-render a finished job with different music.
@@ -20,6 +37,21 @@ export const maxDuration = 30
  */
 export async function POST(req: Request) {
   try {
+    sameOrigin(req)
+    await screenForBot()
+
+    const store = getStore()
+    const subject = `render:${clientIp(req)}`
+    const bucket = (await store.getBucket(subject)) ?? {
+      tokens: RENDER_PER_HOUR,
+      updatedAt: Date.now(),
+    }
+    const limited = take(bucket, RENDER_PER_HOUR, RENDER_REFILL_PER_SEC)
+    await store.putBucket(subject, limited.bucket)
+    if (!limited.ok) {
+      throw new LimitError('too many re-renders — give it a minute', 429, limited.retryAfter)
+    }
+
     const { jobId, themeId, silent } = await req.json()
     if (typeof jobId !== 'string' || typeof themeId !== 'string') {
       return Response.json({ error: 'jobId and themeId are required' }, { status: 400 })
@@ -28,7 +60,7 @@ export async function POST(req: Request) {
     const template = getTemplate('gta-redcarpet')
     const theme = getTheme(template, themeId)
 
-    const shots = await getStore().getJobShots(jobId)
+    const shots = await store.getJobShots(jobId)
     if (!shots || shots.length !== 3) {
       // Expired or unknown: the client falls back to a full generate.
       return Response.json({ error: 'expired', expired: true }, { status: 410 })
@@ -56,6 +88,11 @@ export async function POST(req: Request) {
       ms: Date.now() - started,
     })
   } catch (err) {
+    if (err instanceof LimitError) {
+      const headers: Record<string, string> = {}
+      if (err.retryAfter) headers['Retry-After'] = String(err.retryAfter)
+      return Response.json({ error: err.message }, { status: err.status, headers })
+    }
     const ue = toUserError(err)
     console.error('[render] failed:', ue.detail)
     return Response.json({ error: ue.message }, { status: 500 })

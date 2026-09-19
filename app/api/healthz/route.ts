@@ -9,6 +9,22 @@ export const runtime = 'nodejs'
 export const maxDuration = 30
 
 /**
+ * The media check makes nine HEAD requests to storage. This endpoint is public
+ * and its answer only changes on a deploy, so a flood of calls should not turn
+ * into a flood of outbound requests. Five minutes is short enough that a broken
+ * deploy is still caught on the first request that matters.
+ */
+const MEDIA_TTL_MS = 5 * 60_000
+let mediaChecked = { at: 0, missing: [] as string[] }
+
+async function missingMedia(required: string[]): Promise<string[]> {
+  if (Date.now() - mediaChecked.at < MEDIA_TTL_MS) return mediaChecked.missing
+  const checked = await Promise.all(required.map(async (f) => [f, await resolvable(f)] as const))
+  mediaChecked = { at: Date.now(), missing: checked.filter(([, ok]) => !ok).map(([f]) => f) }
+  return mediaChecked.missing
+}
+
+/**
  * Deploy check: proves the native binaries resolved AND that the files ffmpeg
  * will be handed actually exist here.
  *
@@ -28,8 +44,7 @@ export async function GET() {
       ...t.themes.map((x) => x.file),
       ...t.shots.map((x) => x.file),
     ])
-    const checked = await Promise.all(required.map(async (f) => [f, await resolvable(f)] as const))
-    const missing = checked.filter(([, ok]) => !ok).map(([f]) => f)
+    const missing = await missingMedia(required)
 
     const body = {
       ok: missing.length === 0,
