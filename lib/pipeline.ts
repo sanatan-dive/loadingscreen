@@ -204,13 +204,33 @@ export async function* generate(opts: GenerateOptions): AsyncGenerator<PipelineE
   const theme = getTheme(template, opts.themeId)
 
   const userImage = await decode(opts.photo)
-  const userEmbedding = await embed(userImage)
-  if (!userEmbedding) {
+  const userFace = (await detect(userImage))[0]
+  const userEmbedding = userFace ? await embed(userImage, userFace) : null
+  if (!userEmbedding || !userFace) {
     yield { type: 'error', message: "we couldn't find a face in that photo", costUsd: 0 }
     return
   }
 
-  const facePng = await encodePng(userImage)
+  /*
+   * Send the model a HEAD CROP, not the whole upload.
+   *
+   * The template half of the prompt is a head-box crop, and the user half used
+   * to be the entire photograph — so on an ordinary "someone took a picture of
+   * me standing there" shot, the face the model was asked to copy was a small
+   * patch of a big picture, and it either produced a generic face or handed
+   * back the template's own subject. Production logs showed exactly that:
+   * vsOriginal 0.81-0.90 while vsUser sat at 0.16-0.34.
+   *
+   * Measured on one photo, same source, one variable (scripts/ab-facecrop.ts):
+   *   whole photo   vsUser 0.490  -> REJECTED, escalates, costs 4x
+   *   head crop     vsUser 0.869  -> passes first try
+   *
+   * Cropping to the same framing on both sides is what fixed it.
+   */
+  const userBox = headBox(userFace, userImage.width, userImage.height)
+  const facePng = await encodePng(
+    cropImage(userImage, userBox.x0, userBox.y0, userBox.x1, userBox.y1)
+  )
   const abort = new AbortController()
   const results = template.shots.map((shot) =>
     swapShot(

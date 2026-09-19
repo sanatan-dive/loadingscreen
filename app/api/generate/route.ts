@@ -19,7 +19,14 @@ import { parseAppearance } from '@/lib/appearance'
 import { randomUUID } from 'node:crypto'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+/**
+ * A job that escalates to the expensive model on one shot runs 10s + 10s + 27s
+ * of serial provider calls before it even renders, and a real one was measured
+ * at about a minute. At the old 60s the platform would kill it mid-generation:
+ * the user loses the video, we keep the spend, and it looks like a crash rather
+ * than a slow job. The ceiling should sit above the worst case, not inside it.
+ */
+export const maxDuration = 300
 
 /**
  * Free tier, counted against BOTH the IP and a per-browser id. A shared network
