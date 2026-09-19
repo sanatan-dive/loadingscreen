@@ -20,12 +20,17 @@ afterEach(() => {
 
 describe('browser media URLs', () => {
   it('never point the browser straight at storage', async () => {
+    // Even with storage configured, the browser asks THIS origin: the file is
+    // pulled into the build by scripts/fetch-public-media.ts and served as a
+    // static asset. Pointing at storage is one download per visitor against a
+    // 5GB monthly allowance, and a rewrite does not help - Vercel forwards an
+    // external rewrite per request without caching it (measured: MISS twice).
     process.env.NEXT_PUBLIC_MEDIA_BASE = 'https://example.supabase.co/storage/v1/object/public/media'
     const { publicUrl } = await import('@/lib/media')
 
     const url = publicUrl('/reference.mp4')
     expect(url).not.toContain('supabase')
-    expect(url).toBe('/media/public/reference.mp4')
+    expect(url).toBe('/reference.mp4')
   })
 
   // With the files on disk locally, nothing should be proxied at all.

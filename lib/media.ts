@@ -49,10 +49,13 @@ export const MEDIA_BASE = (process.env.NEXT_PUBLIC_MEDIA_BASE ?? '').replace(/\/
  * it to storage), so each edge fetches a file once and serves it to everyone
  * near it. The server half still talks to storage directly - see lib/media-server.
  */
-export const MEDIA_PROXY = '/media'
-
-/** URL for a file the BROWSER loads, e.g. publicUrl('/reference.mp4'). */
+/**
+ * URL for a file the BROWSER loads, e.g. publicUrl('/reference.mp4').
+ *
+ * Always a plain path: scripts/fetch-public-media.ts puts these files into the
+ * build, so they are served as ordinary static assets from the CDN rather than
+ * fetched from storage by every visitor.
+ */
 export function publicUrl(webPath: string): string {
-  if (!MEDIA_BASE) return webPath
-  return `${MEDIA_PROXY}/public${webPath}`
+  return webPath
 }
