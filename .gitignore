@@ -24,3 +24,4 @@ public/reference-poster.jpg
 tsconfig.tsbuildinfo
 .vercel
 .env*
+assets/fonts/
