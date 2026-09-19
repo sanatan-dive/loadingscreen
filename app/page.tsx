@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Stage, type StageState } from './components/Stage'
 import { UploadCard } from './components/UploadCard'
 import { ShotStrip } from './components/ShotStrip'
@@ -37,6 +37,51 @@ function clientId(): string {
   }
 }
 
+/**
+ * A finished job, remembered just long enough to survive a reload.
+ *
+ * The composited shots are already on the server when the video is sent — but
+ * the jobId that finds them only ever goes to the browser. Reload and the
+ * video still exists and is simply unreachable, while the money that made it
+ * is spent. Thirty minutes is long enough for an accidental reload and short
+ * enough that opening the site tomorrow does not replay yesterday's video.
+ */
+const RESUME_KEY = 'cutscene:last-job'
+const RESUME_WINDOW_MS = 30 * 60_000
+
+interface Resume {
+  jobId: string
+  themeId: string
+  at: number
+}
+
+function rememberJob(r: Resume): void {
+  try {
+    localStorage.setItem(RESUME_KEY, JSON.stringify(r))
+  } catch {
+    // Private windows refuse storage; losing the ability to resume is not
+    // worth failing the render the user just waited for.
+  }
+}
+
+function forgetJob(): void {
+  try {
+    localStorage.removeItem(RESUME_KEY)
+  } catch {}
+}
+
+function recallJob(): Resume | null {
+  try {
+    const raw = localStorage.getItem(RESUME_KEY)
+    if (!raw) return null
+    const saved = JSON.parse(raw) as Resume
+    if (!saved?.jobId || Date.now() - saved.at > RESUME_WINDOW_MS) return null
+    return saved
+  } catch {
+    return null
+  }
+}
+
 const LOADING_LINES = [
   'Stealing your face',
   'Adjusting the jacket',
@@ -70,6 +115,7 @@ export default function Page() {
     setPhase('working')
     setError(null)
     setLimited(false)
+    forgetJob()
     setShots([null, null, null])
     setVideo(null)
     setElapsed(0)
@@ -125,6 +171,7 @@ export default function Page() {
           } else if (ev.type === 'done') {
             setVideo(ev.src)
             setJobId(ev.jobId ?? null)
+            if (ev.jobId) rememberJob({ jobId: ev.jobId, themeId, at: Date.now() })
             setPhase('done')
           } else if (ev.type === 'error') {
             setError(ev.message)
@@ -137,6 +184,60 @@ export default function Page() {
       setPhase('failed')
     } finally {
       if (timer.current) clearInterval(timer.current)
+    }
+  }, [])
+
+  /**
+   * A reload during generation loses the video AND the money that made it, and
+   * the server cannot tell the difference between someone leaving and someone
+   * whose browser crashed. Cheapest fix by far is to ask first.
+   */
+  useEffect(() => {
+    if (phase !== 'working') return
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [phase])
+
+  /**
+   * And if a reload did happen, put the video back. The shots are already
+   * stored server-side, so this is the same free ffmpeg re-render that
+   * switching the soundtrack uses — no image model, no allowance, no spend.
+   */
+  useEffect(() => {
+    const saved = recallJob()
+    if (!saved) return
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: saved.jobId, themeId: saved.themeId }),
+        })
+        if (cancelled) return
+        if (!res.ok) {
+          // Expired, pruned, or refused. Nothing to come back to.
+          forgetJob()
+          return
+        }
+        const body = await res.json()
+        if (cancelled || !body.src) return
+        setVideo(body.src)
+        setJobId(saved.jobId)
+        setTheme(saved.themeId)
+        setPhase('done')
+      } catch {
+        forgetJob()
+      }
+    })()
+
+    return () => {
+      cancelled = true
     }
   }, [])
 
