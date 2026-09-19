@@ -23,6 +23,19 @@ export interface Store {
    */
   putJobShots(jobId: string, shots: Buffer[]): Promise<void>
   getJobShots(jobId: string): Promise<Buffer[] | null>
+
+  /**
+   * Forget the shots of jobs older than `olderThanMs`, returning how many jobs
+   * were removed.
+   *
+   * They exist so someone can change the soundtrack without paying for three
+   * more face swaps, which matters for as long as they still have the page
+   * open - not forever. At 2.63MB a job and a 1GB free-tier bucket, keeping
+   * them forever fills the project in about nine days at the daily ceiling,
+   * and a full Supabase project makes spentToday() return null, which fails
+   * the spend ceiling closed and refuses EVERY generation.
+   */
+  pruneJobShots(olderThanMs: number): Promise<number>
 }
 
 class MemoryStore implements Store {
@@ -69,6 +82,18 @@ class MemoryStore implements Store {
 
   async getJobShots(jobId: string) {
     return this.jobs.get(jobId)?.shots ?? null
+  }
+
+  async pruneJobShots(olderThanMs: number) {
+    const cutoff = Date.now() - olderThanMs
+    let removed = 0
+    for (const [k, v] of this.jobs) {
+      if (v.at < cutoff) {
+        this.jobs.delete(k)
+        removed++
+      }
+    }
+    return removed
   }
 }
 

@@ -77,6 +77,34 @@ export class SupabaseStore implements Store {
     )
   }
 
+  /**
+   * The in-memory store has pruned these from the start - "these are people's
+   * faces; keep them briefly and prune aggressively" - and this implementation
+   * never did, so in production nothing was ever deleted. The upload card tells
+   * people their photo is "deleted after", and 2.63MB a job against a 1GB
+   * bucket fills the project in about nine days at the daily ceiling.
+   */
+  async pruneJobShots(olderThanMs: number): Promise<number> {
+    const cutoff = Date.now() - olderThanMs
+    const { data: folders } = await this.db.storage.from(this.bucket).list('', { limit: 1000 })
+    if (!folders) return 0
+
+    let removed = 0
+    for (const folder of folders) {
+      const { data: files } = await this.db.storage.from(this.bucket).list(folder.name, { limit: 10 })
+      if (!files?.length) continue
+      // Judge the folder by its newest file: a job writes all three at once.
+      const newest = Math.max(...files.map((f) => new Date(f.created_at ?? 0).getTime()))
+      if (!Number.isFinite(newest) || newest >= cutoff) continue
+
+      const { error } = await this.db.storage
+        .from(this.bucket)
+        .remove(files.map((f) => `${folder.name}/${f.name}`))
+      if (!error) removed++
+    }
+    return removed
+  }
+
   async getJobShots(jobId: string): Promise<Buffer[] | null> {
     const out: Buffer[] = []
     for (let i = 0; i < 3; i++) {
