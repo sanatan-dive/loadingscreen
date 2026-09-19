@@ -34,8 +34,25 @@ export const MEDIA_FILES = [
  */
 export const MEDIA_BASE = (process.env.NEXT_PUBLIC_MEDIA_BASE ?? '').replace(/\/$/, '')
 
+/**
+ * The path the browser loads media from. Deliberately OUR origin, not storage's.
+ *
+ * Every visitor autoplays an 843KB hero clip before they touch anything. Served
+ * straight from Supabase that is one download per visitor against a 5GB monthly
+ * allowance — about 5,700 visitors, which a single good tweet passes in an hour.
+ * And the failure is not just a missing video: the same Supabase project holds
+ * the rate buckets and the spend ledger, so a restricted project makes
+ * spentToday() return null, the ceiling fails closed, and EVERY generation
+ * refuses. Success would have taken the product down.
+ *
+ * Going through /media instead puts Vercel's CDN in front (next.config rewrites
+ * it to storage), so each edge fetches a file once and serves it to everyone
+ * near it. The server half still talks to storage directly - see lib/media-server.
+ */
+export const MEDIA_PROXY = '/media'
+
 /** URL for a file the BROWSER loads, e.g. publicUrl('/reference.mp4'). */
 export function publicUrl(webPath: string): string {
   if (!MEDIA_BASE) return webPath
-  return `${MEDIA_BASE}/public${webPath}`
+  return `${MEDIA_PROXY}/public${webPath}`
 }

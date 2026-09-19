@@ -48,6 +48,16 @@ const config: NextConfig = {
    * served from, which relaxes the framing headers back to 'self' there. That
    * only works because it appends AFTER these: do not move this below it.
    */
+  /**
+   * Browser-facing media is proxied through this origin so Vercel's CDN caches
+   * it, instead of every visitor downloading it from Supabase Storage. See the
+   * note on publicUrl() in lib/media.ts for the arithmetic.
+   */
+  async rewrites() {
+    const base = (process.env.NEXT_PUBLIC_MEDIA_BASE ?? '').replace(/\/$/, '')
+    if (!base) return []
+    return [{ source: '/media/:path*', destination: `${base}/:path*` }]
+  },
   async headers() {
     return [
       {
@@ -65,6 +75,13 @@ const config: NextConfig = {
             value: 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()',
           },
         ],
+      },
+      {
+        // The media never changes once uploaded, so let every layer keep it.
+        // Without this the CDN honours storage's one-hour max-age and re-fetches
+        // far more often than it needs to.
+        source: '/media/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
       {
         // A generated video is one person's face. It must never be cached by a
