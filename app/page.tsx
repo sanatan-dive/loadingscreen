@@ -57,6 +57,8 @@ export default function Page() {
   const [shots, setShots] = useState<(string | null)[]>([null, null, null])
   const [video, setVideo] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /** The refusal was "you have had your video today", not a failure. */
+  const [limited, setLimited] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastFile = useRef<File | null>(null)
@@ -67,6 +69,7 @@ export default function Page() {
   const run = useCallback(async (file: File, themeId: string, look: Appearance) => {
     setPhase('working')
     setError(null)
+    setLimited(false)
     setShots([null, null, null])
     setVideo(null)
     setElapsed(0)
@@ -86,7 +89,19 @@ export default function Page() {
         headers: { 'x-cutscene-client': clientId() },
       })
       if (!res.ok || !res.body) {
-        throw new Error((await res.json().catch(() => ({}))).error ?? 'request failed')
+        const body = await res.json().catch(() => ({}))
+        /*
+         * Show the server's message as written. The guards author their own
+         * copy for the user — "we're poor on credits" is the honest reason
+         * someone cannot have another video — and toUserError() exists to
+         * translate INTERNAL failures, so it does not recognise that sentence
+         * and replaced it with "Something went wrong. Try again." The one
+         * message the product most wanted to say was the one nobody saw.
+         */
+        setError(body.error ?? toUserError(new Error('request failed')).message)
+        setLimited(res.status === 429)
+        setPhase('failed')
+        return
       }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -446,10 +461,15 @@ export default function Page() {
                 {error}
               </p>
               <p style={{ margin: '0 0 24px', color: 'var(--ink-soft)', fontSize: 14 }}>
-                Nothing was charged. A clear, front-facing photo usually fixes it.
+                {limited
+                  ? 'Nothing was charged. Your free one comes back tomorrow.'
+                  : 'Nothing was charged. A clear, front-facing photo usually fixes it.'}
               </p>
               <button onClick={() => setPhase('idle')} style={skewButton('var(--accent)')}>
-                <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>Try again</span>
+                <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
+                  {/* "Try again" is a lie when trying again gives the same answer. */}
+                  {limited ? 'Back' : 'Try again'}
+                </span>
               </button>
             </div>
           )}
