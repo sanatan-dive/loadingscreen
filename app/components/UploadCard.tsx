@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { extractImage, IntakeError, ACCEPTED_TYPES } from '@/lib/image-intake'
+import { extractImage, shrinkForUpload, IntakeError, ACCEPTED_TYPES } from '@/lib/image-intake'
 import { CameraCapture } from './CameraCapture'
 
 interface Props {
@@ -40,7 +40,7 @@ export function UploadCard({ onFile, disabled }: Props) {
         // Acknowledge before the flow takes over — otherwise a paste feels
         // like nothing happened at all.
         setFlash(source === 'paste' ? 'Pasted' : 'Got it')
-        onFile(file)
+        onFile(await shrinkForUpload(file))
       } catch (err) {
         setError(err instanceof IntakeError ? err.message : 'Could not read that image.')
       }
@@ -49,7 +49,7 @@ export function UploadCard({ onFile, disabled }: Props) {
   )
 
   const acceptFile = useCallback(
-    (file: File | undefined | null) => {
+    async (file: File | undefined | null) => {
       setError(null)
       if (!file) return
       if (!(ACCEPTED_TYPES as readonly string[]).includes(file.type)) {
@@ -60,7 +60,7 @@ export function UploadCard({ onFile, disabled }: Props) {
         setError("That photo's over 10MB. Try a smaller one.")
         return
       }
-      onFile(file)
+      onFile(await shrinkForUpload(file))
     },
     [onFile]
   )
@@ -174,7 +174,7 @@ export function UploadCard({ onFile, disabled }: Props) {
         type="file"
         accept={ACCEPTED_TYPES.join(',')}
         hidden
-        onChange={(e) => acceptFile(e.target.files?.[0])}
+        onChange={(e) => void acceptFile(e.target.files?.[0])}
       />
 
       {hasCamera && (

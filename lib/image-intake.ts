@@ -98,3 +98,43 @@ export async function extractImage(dt: DataTransfer | null): Promise<File | null
   }
   return null
 }
+
+/**
+ * Vercel refuses a request body over 4.5MB before it ever reaches the function,
+ * and answers with its own error page rather than anything this app can phrase.
+ * Measured on production: 4.0MB arrives, 4.4MB does not. A phone photo is
+ * routinely bigger than that, so the product's core action failed for a large
+ * share of its users with "Something went wrong."
+ *
+ * So a photo that would not survive the trip is resized before it is sent.
+ * Nothing smaller is touched — the common path is byte-for-byte what it was —
+ * and 2048px is far more resolution than a 960x720 frame can use anyway.
+ */
+const SEND_LIMIT_BYTES = 3.5 * 1024 * 1024
+const MAX_EDGE = 2048
+
+export async function shrinkForUpload(file: File): Promise<File> {
+  if (file.size <= SEND_LIMIT_BYTES) return file
+
+  try {
+    // from-image bakes the EXIF rotation into the pixels, so the server sees a
+    // photo that is already the right way up.
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(bitmap.width * scale)
+    canvas.height = Math.round(bitmap.height * scale)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', 0.92))
+    if (!blob || blob.size >= file.size) return file
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+  } catch {
+    // An image this browser cannot decode is not one we can shrink. Send the
+    // original and let the server say no — no worse than before this existed.
+    return file
+  }
+}

@@ -10,6 +10,11 @@ export interface RawImage {
 /** Decode any supported image to interleaved BGR. */
 export async function decode(buf: Buffer | Uint8Array): Promise<RawImage> {
   const { data, info } = await sharp(Buffer.from(buf))
+    // A phone stores the pixels as the sensor saw them plus an EXIF flag for
+    // which way is up; sharp does not apply that flag unless asked. Without
+    // this, every portrait photo from a phone is decoded on its side and the
+    // face goes into the video rotated 90 degrees.
+    .rotate()
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })
