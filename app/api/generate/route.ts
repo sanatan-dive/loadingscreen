@@ -60,6 +60,42 @@ function clientIp(req: Request): string {
   return fwd?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
 }
 
+const VISITOR_COOKIE = 'cutscene_visitor'
+
+/**
+ * A third identity signal, because the other two both leak.
+ *
+ * The IP rotates on mobile carriers — the same tester appeared as
+ * 152.58.182.119 one day and 49.43.145.167 the next — and the browser id lives
+ * in localStorage, which a new window or a cleared site clears. This one is an
+ * HttpOnly cookie the SERVER issues, so page scripts cannot read or forge it
+ * and it survives closing and reopening the site.
+ *
+ * It is not unspoofable: a private window or cleared cookies still mints a new
+ * one. Stopping that needs a real identity check (Turnstile or sign-in), which
+ * is a product decision, not a header.
+ */
+function visitorId(req: Request): { id: string; fresh: boolean } {
+  const match = /(?:^|;\s*)cutscene_visitor=([0-9a-f-]{36})/.exec(req.headers.get('cookie') ?? '')
+  return match ? { id: match[1], fresh: false } : { id: randomUUID(), fresh: true }
+}
+
+/**
+ * One year: the allowance is daily, but the identity should outlive it.
+ *
+ * `Secure` only over https — a Secure cookie is silently dropped on plain
+ * HTTP, which would make local testing behave differently from production for
+ * no visible reason.
+ */
+function visitorCookie(req: Request, id: string): string {
+  const https = new URL(req.url).protocol === 'https:' ||
+    req.headers.get('x-forwarded-proto') === 'https'
+  return (
+    `${VISITOR_COOKIE}=${id}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax` +
+    (https ? '; Secure' : '')
+  )
+}
+
 /**
  * Hand back the tokens this request took.
  *
@@ -92,6 +128,11 @@ export async function POST(req: Request) {
   let parsed: ReturnType<typeof parseBody>
   let photo: Buffer
 
+  // Resolved before the guards so a refusal still issues the cookie — otherwise
+  // the person who gets told "come back tomorrow" is the one person who never
+  // receives an identity, and their next visit starts clean.
+  const visitor = visitorId(req)
+
   // Subjects charged for this request, so anything that ends without a video
   // can hand the allowance back. Being refused must not cost a video, and
   // neither must a generation that fails halfway.
@@ -104,9 +145,11 @@ export async function POST(req: Request) {
 
     await validateUpload(photo)
 
-    // Charge both subjects; refuse if either is exhausted.
+    // Charge every subject; refuse if ANY of them is exhausted. Three signals
+    // because each one alone leaks: the IP rotates on mobile, localStorage
+    // clears with the window, and the cookie goes in a private session.
     const browserId = (req.headers.get('x-cutscene-client') ?? '').slice(0, 64)
-    const subjects = [`ip:${clientIp(req)}`]
+    const subjects = [`ip:${clientIp(req)}`, `visitor:${visitor.id}`]
     if (/^[a-zA-Z0-9-]{8,64}$/.test(browserId)) subjects.push(`browser:${browserId}`)
 
     for (const subject of subjects) {
@@ -117,8 +160,13 @@ export async function POST(req: Request) {
       const result = take(existing, BUCKET_CAPACITY, BUCKET_REFILL_PER_SEC)
       await store.putBucket(subject, result.bucket)
       if (!result.ok) {
+        // Says what happened and why, without pretending it is the user's
+        // fault. Every video costs real money; "poor on credits" is the honest
+        // reason and it reads better than a quota number.
         throw new LimitError(
-          `That is your ${FREE_VIDEOS_PER_DAY} free videos for today.`,
+          FREE_VIDEOS_PER_DAY === 1
+            ? "That's your free one for today. We're poor on credits — come back tomorrow."
+            : `That's your ${FREE_VIDEOS_PER_DAY} free videos for today. We're poor on credits — come back tomorrow.`,
           429,
           result.retryAfter
         )
@@ -146,7 +194,7 @@ export async function POST(req: Request) {
     }
     const status = err instanceof LimitError ? err.status : 400
     const message = err instanceof Error ? err.message : 'bad request'
-    const headers: Record<string, string> = {}
+    const headers: Record<string, string> = { 'Set-Cookie': visitorCookie(req, visitor.id) }
     if (err instanceof LimitError && err.retryAfter) {
       headers['Retry-After'] = String(err.retryAfter)
     }
@@ -217,6 +265,7 @@ export async function POST(req: Request) {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
+      'Set-Cookie': visitorCookie(req, visitor.id),
     },
   })
 }
