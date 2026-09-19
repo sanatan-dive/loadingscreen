@@ -2,14 +2,13 @@ import { readFile, unlink } from 'node:fs/promises'
 import sharp from 'sharp'
 import { generate } from '@/lib/pipeline'
 import { getTemplate, getTheme } from '@/lib/template'
-import { getStore } from '@/lib/store'
+import { getStore, type Store } from '@/lib/store'
 import {
   checkSpendCeiling,
   take,
   LimitError,
   FREE_VIDEOS_PER_DAY,
   FREE_REFILL_PER_SEC,
-  type Bucket,
 } from '@/lib/limits'
 import { validateUpload } from '@/lib/limits/upload'
 import { screenForPublicFigure } from '@/lib/limits/figure'
@@ -21,9 +20,9 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 /**
- * Free tier: three generations per day, counted against BOTH the IP and a
- * per-browser id. A shared network should not spend one person's allowance,
- * and clearing a cookie should not hand out three more.
+ * Free tier, counted against BOTH the IP and a per-browser id. A shared network
+ * should not spend one person's allowance, and clearing a cookie should not
+ * hand out a fresh one. FREE_VIDEOS_PER_DAY sets the size.
  */
 const BUCKET_CAPACITY = FREE_VIDEOS_PER_DAY
 const BUCKET_REFILL_PER_SEC = FREE_REFILL_PER_SEC
@@ -61,14 +60,42 @@ function clientIp(req: Request): string {
   return fwd?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
 }
 
+/**
+ * Hand back the tokens this request took.
+ *
+ * A free video is what the user gets, not what they attempted: if no video
+ * comes out, the allowance must be untouched. At one video a day a single
+ * failure would otherwise lock someone out until tomorrow, having given them
+ * nothing — the worst outcome the product can produce.
+ *
+ * Re-reads and credits one token rather than restoring a snapshot, so a
+ * concurrent request from the same subject cannot be overwritten, and clamps to
+ * capacity so a refund can never mint an extra video.
+ */
+async function refund(store: Store, subjects: string[]): Promise<void> {
+  for (const subject of subjects) {
+    try {
+      const current = await store.getBucket(subject)
+      if (!current) continue
+      await store.putBucket(subject, {
+        tokens: Math.min(BUCKET_CAPACITY, current.tokens + 1),
+        updatedAt: Date.now(),
+      })
+    } catch {
+      // A failed refund must not turn into a failed response.
+    }
+  }
+}
+
 export async function POST(req: Request) {
   const store = getStore()
   let parsed: ReturnType<typeof parseBody>
   let photo: Buffer
 
-  // Buckets as they were before this request, so a guard that fires after the
-  // token was taken can hand it back. Being refused must not cost a video.
-  const taken: { subject: string; before: Bucket }[] = []
+  // Subjects charged for this request, so anything that ends without a video
+  // can hand the allowance back. Being refused must not cost a video, and
+  // neither must a generation that fails halfway.
+  const charged: string[] = []
 
   // ---- guards, all before a single cent is spent ----
   try {
@@ -96,7 +123,7 @@ export async function POST(req: Request) {
           result.retryAfter
         )
       }
-      taken.push({ subject, before: existing })
+      charged.push(subject)
     }
 
     // Famous faces are refused before any image spend. Runs after the token
@@ -112,9 +139,7 @@ export async function POST(req: Request) {
     // Every guard past the take refuses the job, so none of them may keep the
     // token: a public figure, a down classifier and our own ceiling are all
     // our "no", not a video the user received.
-    for (const { subject, before } of taken) {
-      await store.putBucket(subject, before).catch(() => {})
-    }
+    await refund(store, charged)
     // A guard that spent money before saying no still spent it.
     if (err instanceof LimitError && err.costUsd > 0) {
       await store.recordSpend(err.costUsd).catch(() => {})
@@ -133,6 +158,10 @@ export async function POST(req: Request) {
     async start(controller) {
       const send = (e: unknown) =>
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`))
+
+      // Only a delivered video keeps the allowance. Anything else — a pipeline
+      // error, a crash, a render that never arrives — hands it back.
+      let delivered = false
 
       try {
         for await (const ev of generate({
@@ -157,6 +186,8 @@ export async function POST(req: Request) {
               costUsd: ev.costUsd,
               ms: ev.ms,
             })
+            // The video is on the wire: this is the only path that keeps it.
+            delivered = true
             unlink(ev.video).catch(() => {})
           } else {
             // A failed job still burned tokens upstream; record what was spent
@@ -173,6 +204,9 @@ export async function POST(req: Request) {
         console.error('[generate] failed:', ue.detail)
         send({ type: 'error', message: ue.message })
       } finally {
+        // One place, so no future failure path can forget it. A free video is
+        // what the user got, not what they attempted.
+        if (!delivered) await refund(store, charged)
         controller.close()
       }
     },

@@ -1,6 +1,7 @@
 import { runtimeInfo } from '@/lib/runtime'
 import { resolvable } from '@/lib/media-server'
 import { DAILY_CEILING_USD, FREE_VIDEOS_PER_DAY } from '@/lib/limits'
+import { FIGURE_CHECK_ENABLED } from '@/lib/limits/figure'
 import { listTemplates } from '@/lib/template'
 import { getStore } from '@/lib/store'
 
@@ -40,6 +41,9 @@ export async function GET() {
       // deployment is actually running under — only what you believe you set.
       freeVideosPerDay: FREE_VIDEOS_PER_DAY,
       dailyCeilingUsd: DAILY_CEILING_USD,
+      // Visible on purpose: whether a deployment screens public figures should
+      // never be something you have to guess at.
+      publicFigureCheck: FIGURE_CHECK_ENABLED,
     }
     return Response.json(body, { status: body.ok ? 200 : 503 })
   } catch (err) {

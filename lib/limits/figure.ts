@@ -38,6 +38,19 @@ import { LimitError } from './index'
  */
 export const FIGURE_CONFIDENCE = 0.6
 
+/**
+ * Operator switch, owned by the person running the deployment.
+ *
+ * Default ON, so a fresh clone screens by default and turning it off is a
+ * deliberate act. Set FIGURE_CHECK=off in the environment to disable. It is a
+ * config flag rather than a code deletion on purpose: if a complaint or a
+ * takedown arrives, protection comes back by changing one variable instead of
+ * writing and shipping code.
+ *
+ * Off means any recognisable person can be placed into the template.
+ */
+export const FIGURE_CHECK_ENABLED = (process.env.FIGURE_CHECK ?? 'on') !== 'off'
+
 export type Classifier = (photo: Buffer) => Promise<FigureVerdict>
 
 /** `IShowSpeed` and `iShowSpeed.` are the same claim. */
@@ -73,6 +86,9 @@ export async function screenForPublicFigure(
   photo: Buffer,
   classify: Classifier = providerClassify
 ): Promise<{ costUsd: number }> {
+  // Disabled by the operator: no classifier call, so it costs nothing when off.
+  if (!FIGURE_CHECK_ENABLED) return { costUsd: 0 }
+
   let verdicts: FigureVerdict[]
   try {
     // Both views at once: the check sits in front of every generation, so it

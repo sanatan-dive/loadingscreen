@@ -1,10 +1,56 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { screenForPublicFigure, FIGURE_CONFIDENCE } from '@/lib/limits/figure'
 import { LimitError } from '@/lib/limits'
 import type { FigureVerdict } from '@/lib/provider'
 
 const photo = readFileSync('tests/fixtures/user.png')
+
+afterEach(() => {
+  delete process.env.FIGURE_CHECK
+  vi.resetModules()
+})
+
+describe('the operator switch', () => {
+  it('screens by default — a fresh clone must not be open', async () => {
+    vi.resetModules()
+    const { FIGURE_CHECK_ENABLED } = await import('@/lib/limits/figure')
+    expect(FIGURE_CHECK_ENABLED).toBe(true)
+  })
+
+  it('only "off" disables it — a typo must fail safe', async () => {
+    for (const value of ['', 'false', '0', 'no', 'OFF ']) {
+      vi.resetModules()
+      process.env.FIGURE_CHECK = value
+      const { FIGURE_CHECK_ENABLED } = await import('@/lib/limits/figure')
+      expect(FIGURE_CHECK_ENABLED, `FIGURE_CHECK=${JSON.stringify(value)}`).toBe(true)
+    }
+  })
+
+  it('makes no classifier call when switched off', async () => {
+    vi.resetModules()
+    process.env.FIGURE_CHECK = 'off'
+    const mod = await import('@/lib/limits/figure')
+    const classifier = vi.fn(async () => {
+      throw new Error('classifier must not be called when the check is off')
+    })
+    await expect(mod.screenForPublicFigure(photo, classifier)).resolves.toEqual({ costUsd: 0 })
+    expect(classifier).not.toHaveBeenCalled()
+  })
+
+  it('lets a recognised public figure straight through when off', async () => {
+    vi.resetModules()
+    process.env.FIGURE_CHECK = 'off'
+    const mod = await import('@/lib/limits/figure')
+    const famous = async (): Promise<FigureVerdict> => ({
+      known: true,
+      name: 'IShowSpeed',
+      confidence: 1,
+      costUsd: 0.00035,
+    })
+    await expect(mod.screenForPublicFigure(photo, famous)).resolves.toBeDefined()
+  })
+})
 
 const verdict = (v: Partial<FigureVerdict> = {}): FigureVerdict => ({
   known: false,
