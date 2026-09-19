@@ -1,4 +1,4 @@
-# Cutscene
+# Loading Screen
 
 Upload one photo. Get a 15-second GTA-style cinematic intro with your face in it.
 

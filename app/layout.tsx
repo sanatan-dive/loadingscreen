@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   // Every relative URL below resolves against this. Without it Next resolves
   // them against localhost at build time and every share card 404s.
   metadataBase: new URL(SITE_URL),
-  title: 'Cutscene — get on the loading screen',
+  title: 'Loading Screen — your own GTA intro in 15 seconds',
   description:
     'Upload one photo. Get a 15-second GTA-style cinematic intro with your face in it. Free, no sign-up, about fifteen seconds.',
   applicationName: SITE_NAME,
@@ -53,15 +53,15 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     locale: 'en_US',
     url: SITE_URL,
-    title: 'Cutscene — get on the loading screen',
+    title: 'Loading Screen — your own GTA intro in 15 seconds',
     description: 'Upload one photo. Get your own GTA-style cinematic intro in about fifteen seconds.',
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Cutscene — get on the loading screen' }],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Loading Screen — get on the loading screen' }],
   },
   // Without this the link posts as a bare URL with no picture — and the share
   // is the entire growth loop.
   twitter: {
     card: 'summary_large_image',
-    title: 'Cutscene — get on the loading screen',
+    title: 'Loading Screen — your own GTA intro in 15 seconds',
     description: 'Upload one photo. Get your own GTA-style cinematic intro in about fifteen seconds.',
     images: ['/og.png'],
   },

@@ -9,7 +9,7 @@
  */
 export const SITE_URL = 'https://loadingscreen.xyz'
 
-export const SITE_NAME = 'Cutscene'
+export const SITE_NAME = 'Loading Screen'
 
 /**
  * Preview deployments answer on their own vercel.app hostnames. They serve

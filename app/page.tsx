@@ -216,7 +216,7 @@ export default function Page() {
       >
         <a
           href="/"
-          aria-label="Cutscene home"
+          aria-label="Loading Screen home"
           style={{ pointerEvents: 'auto', display: 'inline-flex', textDecoration: 'none' }}
           onClick={(e) => {
             // Reset in place rather than reloading and losing the result.
@@ -383,7 +383,7 @@ export default function Page() {
               <MissionBanner title="Mission Passed" sub="Respect ++" tone="green" />
 
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <a href={video} download="cutscene.mp4" style={skewButton('var(--accent)')}>
+                <a href={video} download="loadingscreen.mp4" style={skewButton('var(--accent)')}>
                   <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>Download</span>
                 </a>
                 <button
@@ -391,7 +391,7 @@ export default function Page() {
                     const text = 'I got on the loading screen 🎬'
                     try {
                       const blob = await (await fetch(video)).blob()
-                      const file = new File([blob], 'cutscene.mp4', { type: 'video/mp4' })
+                      const file = new File([blob], 'loadingscreen.mp4', { type: 'video/mp4' })
                       if (navigator.canShare?.({ files: [file] })) {
                         await navigator.share({ files: [file], text })
                         return
@@ -403,7 +403,7 @@ export default function Page() {
                     // downloaded and the composer is opened pre-filled.
                     const a = document.createElement('a')
                     a.href = video
-                    a.download = 'cutscene.mp4'
+                    a.download = 'loadingscreen.mp4'
                     a.click()
                     const url = new URL('https://x.com/intent/tweet')
                     url.searchParams.set('text', `${text}\n${window.location.origin}`)
