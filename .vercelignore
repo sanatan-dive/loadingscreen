@@ -28,8 +28,14 @@ node_modules
 out
 spike
 tests
-scripts
 docs
+
+# ...except the one script the BUILD itself runs. Excluding the whole directory
+# meant `npm prebuild` could not find it and the deploy failed with
+# ERR_MODULE_NOT_FOUND. Listing the contents rather than the directory is what
+# lets a single file be added back.
+scripts/*
+!scripts/fetch-public-media.ts
 
 tsconfig.tsbuildinfo
 *.log
