@@ -210,7 +210,7 @@ export default function Page() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '15px 18px',
+          padding: 'var(--hud-pad-y) var(--hud-pad-x)',
           pointerEvents: 'none',
         }}
       >
@@ -231,7 +231,7 @@ export default function Page() {
           <WantedStars level={phase === 'done' ? 5 : phase === 'working' ? 3 : 1} />
         </a>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, pointerEvents: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--hud-gap)', pointerEvents: 'auto' }}>
           {phase === 'idle' && (
             <button
               onClick={() => setHeroMuted((m) => !m)}
@@ -239,8 +239,8 @@ export default function Page() {
               aria-pressed={!heroMuted}
               title={heroMuted ? 'Sound on' : 'Sound off'}
               style={{
-                width: 34,
-                height: 34,
+                width: 'var(--hud-btn)',
+                height: 'var(--hud-btn)',
                 display: 'grid',
                 placeItems: 'center',
                 borderRadius: 999,
@@ -273,8 +273,8 @@ export default function Page() {
               transform: 'skewX(-9deg)',
               background: 'var(--gold)',
               color: '#08080c',
-              padding: '7px 13px',
-              fontSize: 10,
+              padding: 'var(--chip-pad)',
+              fontSize: 'var(--chip-fs)',
               fontWeight: 800,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
@@ -296,7 +296,7 @@ export default function Page() {
           minHeight: '100dvh',
           display: 'grid',
           placeItems: 'center',
-          padding: '62px 16px 50px',
+          padding: 'var(--page-pad-top) 16px 50px',
         }}
       >
         <div style={{ width: '100%', maxWidth: 940, display: 'grid', justifyItems: 'center' }}>
@@ -304,7 +304,7 @@ export default function Page() {
           <header
             style={{
               textAlign: 'center',
-              marginBottom: phase === 'idle' ? 34 : 0,
+              marginBottom: phase === 'idle' ? 'var(--stack-gap)' : 0,
               maxHeight: phase === 'idle' ? 470 : 0,
               opacity: phase === 'idle' ? 1 : 0,
               overflow: 'hidden',
@@ -316,21 +316,21 @@ export default function Page() {
             </div>
             <h1 style={{ margin: 0 }}>
               <span style={{ display: 'block', whiteSpace: 'nowrap' }}>
-                <Pricedown size="clamp(44px, 11.5vw, 104px)" tone="gold" stroke={3.4}>
+                <Pricedown size="var(--h1)" tone="gold" stroke={3.4}>
                   Get on the
                 </Pricedown>
               </span>
               <span style={{ display: 'block', whiteSpace: 'nowrap' }}>
-                <Pricedown size="clamp(44px, 11.5vw, 104px)" tone="gold" stroke={3.4}>
+                <Pricedown size="var(--h1)" tone="gold" stroke={3.4}>
                   loading screen
                 </Pricedown>
               </span>
             </h1>
             <p
               style={{
-                margin: '28px auto 0',
+                margin: '22px auto 0',
                 maxWidth: 410,
-                fontSize: 16,
+                fontSize: 'var(--lede)',
                 fontWeight: 560,
                 lineHeight: 1.5,
                 color: 'var(--ink-soft)',

@@ -101,7 +101,7 @@ export function UploadCard({ onFile, disabled }: Props) {
         style={{
           width: '100%',
           display: 'block',
-          padding: '30px 26px',
+          padding: 'var(--card-pad)',
           transform: over ? 'skewX(-7deg) translate(-3px,-3px)' : 'skewX(-7deg)',
           background: over ? 'var(--accent-soft)' : 'rgba(20,20,29,.82)',
           border: '3px solid var(--accent)',
@@ -117,7 +117,7 @@ export function UploadCard({ onFile, disabled }: Props) {
           <div
             aria-hidden
             style={{
-              width: 56,
+              width: 'var(--card-icon)',
               height: 56,
               margin: '0 auto 16px',
               background: 'var(--accent)',

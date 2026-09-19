@@ -31,6 +31,46 @@
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --morph: 900ms;
+
+  /* Sizes that have to come down on a phone.
+     Measured on the live site: the top HUD needs 479px of content — five 20px
+     stars (112), the sound toggle (34), the money chip (25) and a 248px
+     "HELP ME RECOVER MY DOMAIN COST" — against a 390px screen. Everything below
+     is one token so the mobile block can shrink it without fighting the inline
+     styles the components are written with. */
+  --hud-pad-y: 15px;
+  --hud-pad-x: 18px;
+  --hud-gap: 14px;
+  --star: 20px;
+  --chip-fs: 10px;
+  --chip-pad: 7px 13px;
+  --hud-btn: 34px;
+
+  --h1: clamp(44px, 11.5vw, 104px);
+  --lede: 16px;
+  --page-pad-top: 62px;
+  --card-pad: 30px 26px;
+  --card-icon: 56px;
+  --stack-gap: 34px;
+}
+
+@media (max-width: 560px) {
+  :root {
+    --hud-pad-y: 10px;
+    --hud-pad-x: 11px;
+    --hud-gap: 7px;
+    --star: 13px;
+    --chip-fs: 8.5px;
+    --chip-pad: 6px 8px;
+    --hud-btn: 28px;
+
+    --h1: clamp(30px, 8.6vw, 44px);
+    --lede: 14.5px;
+    --page-pad-top: 50px;
+    --card-pad: 20px 16px;
+    --card-icon: 44px;
+    --stack-gap: 22px;
+  }
 }
 
 * {

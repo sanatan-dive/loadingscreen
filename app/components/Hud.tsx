@@ -72,11 +72,13 @@ export function WantedStars({ level = 3, max = 5 }: { level?: number; max?: numb
       {Array.from({ length: max }).map((_, i) => (
         <svg
           key={i}
-          width="20"
-          height="20"
           viewBox="0 0 24 24"
           aria-hidden
           style={{
+            // A CSS variable, not a width attribute: presentation attributes do
+            // not accept var(), so the stars would not shrink on a phone.
+            width: 'var(--star)',
+            height: 'var(--star)',
             filter: i < level ? 'drop-shadow(1.5px 1.5px 0 #0B0B0C)' : 'none',
             opacity: i < level ? 1 : 0.22,
           }}
