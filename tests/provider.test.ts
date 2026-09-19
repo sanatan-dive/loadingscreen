@@ -19,7 +19,19 @@ afterEach(() => {
 describe('model ladder', () => {
   it('puts flash-lite first - fastest, cheapest AND most accurate', () => {
     expect(MODEL_LADDER[0]).toBe('google/gemini-3.1-flash-lite-image')
-    expect(MODEL_LADDER).toHaveLength(2)
+    expect(MODEL_LADDER).toHaveLength(3)
+  })
+
+  // The models are nondeterministic - one photo passed the gate twice and
+  // failed once through the same model in the same hour. Re-rolling the cheap
+  // model costs $0.0342/10s against pro's $0.1405/27s, so it goes first.
+  it('re-rolls the cheap model before paying for the expensive one', () => {
+    expect(MODEL_LADDER[1]).toBe('google/gemini-3.1-flash-lite-image')
+    expect(MODEL_LADDER[2]).toBe('google/gemini-3-pro-image')
+  })
+
+  it('reaches the strong model only as a last resort', () => {
+    expect(MODEL_LADDER.indexOf('google/gemini-3-pro-image')).toBe(MODEL_LADDER.length - 1)
   })
   it('excludes models that failed identity or are strictly dominated', () => {
     expect(MODEL_LADDER).not.toContain('google/gemini-2.5-flash-image')

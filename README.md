@@ -37,7 +37,14 @@ standing between users and videos of strangers; do not make it optional.
 | `gemini-2.5-flash-image` | 11.9s | $0.0389 | 0.246 ✗ |
 
 `flash-image` is slower, pricier *and* less accurate than `flash-lite`, so it
-is not in the ladder at all. Two rungs: flash-lite, then pro.
+is not in the ladder at all.
+
+The ladder is **flash-lite, flash-lite, pro**. The repetition is deliberate:
+these models are nondeterministic, and one photo passed the identity gate on
+two runs and failed it on a third within the same hour. A rejection often means
+"not that time" rather than "this model cannot do this face", so the cheap model
+is re-rolled ($0.0342, ~10s) before paying for pro ($0.1405, ~27s). Three
+attempts also means one fewer way for a job to fail outright.
 
 **The smile is the joke, and it must be authored.** Pointing the model at the
 reference frame for expression drags the reference's bone structure and skin

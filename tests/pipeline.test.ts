@@ -26,12 +26,14 @@ describe('swapShot escalation', () => {
       { shot, facePng: facePng(), userEmbedding: null },
       { edit: edit as any, verify: verify as any }
     )
+    // Re-roll the cheap model first, pay for pro only when that fails too.
     expect(tried).toEqual([
+      'google/gemini-3.1-flash-lite-image',
       'google/gemini-3.1-flash-lite-image',
       'google/gemini-3-pro-image',
     ])
-    expect(r.ok).toBe(false)   // only two rungs; the third verdict never runs
-    expect(r.attempts).toBe(2)
+    expect(r.ok).toBe(true)
+    expect(r.attempts).toBe(3)
   }, 30_000)
 
   it('stops at the first model when it passes - no wasted spend', async () => {
@@ -58,7 +60,7 @@ describe('swapShot escalation', () => {
     )
     expect(r.ok).toBe(false)
     expect(r.charged).toBe(false)
-    expect(edit).toHaveBeenCalledTimes(2)
+    expect(edit).toHaveBeenCalledTimes(3)
   }, 30_000)
 
   it('survives a provider throwing and still escalates', async () => {

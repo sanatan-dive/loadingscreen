@@ -7,6 +7,7 @@ import {
   embed,
   cosine,
   crop as cropImage,
+  GATE,
   type Face,
   type RawImage,
 } from '@/lib/identity'
@@ -139,6 +140,19 @@ export async function swapShot(
 
     if (!gate.pass) {
       lastReason = gate.reason ?? 'rejected'
+      /*
+       * What the gate actually saw when it said no. Escalation is the single
+       * largest cost in a job, and whether it is avoidable depends entirely on
+       * where rejections land: clustered just under the threshold means the
+       * bar is too high and is costing money for nothing; scattered far below
+       * means the gate is doing its job and there is nothing to win. Passes
+       * observed so far sit at 0.61-0.79 against a 0.55 bar - nothing has ever
+       * squeaked through - so the rejected side is the half we cannot see.
+       */
+      console.info(
+        `[gate] rejected ${input.shot.id} on ${model}: ` +
+          `vsUser=${gate.vsUser.toFixed(3)} vsOriginal=${gate.vsOriginal.toFixed(3)} bar=${GATE}`
+      )
       continue
     }
 

@@ -17,17 +17,28 @@ export interface EditResult {
 }
 
 /**
- * Two rungs, not three. Measured on the same crop and face:
+ * Measured on the same crop and face:
  *
  *   flash-lite   10.2s  $0.0342  identity 0.804   <- default
  *   flash-image  13.0s  $0.0684  identity 0.640   <- strictly dominated, omitted
- *   pro-image    26.6s  $0.1405  identity 0.799   <- fallback
+ *   pro-image    26.6s  $0.1405  identity 0.799   <- last resort
  *
- * flash-image is slower AND pricier AND less accurate than flash-lite, so it
- * only ever added latency and spend. Dropping it caps the worst case around
- * 36s instead of 50s.
+ * flash-image is slower AND pricier AND less accurate than flash-lite, so it is
+ * not here at all.
+ *
+ * flash-lite appears TWICE, and that is the point. These models are
+ * nondeterministic: the same photo, through the same model, with the same
+ * prompt, passed the identity gate on two runs and failed it on a third within
+ * the same hour. A rejection therefore does not mean "this model cannot do this
+ * face" — often it means "not that time". Asking again costs $0.0342 and ~10s;
+ * jumping straight to pro costs $0.1405 and ~27s. So we re-roll the cheap model
+ * once before paying for the expensive one.
+ *
+ * Three attempts also means one fewer way for a job to fail outright, which is
+ * the thing users actually notice.
  */
 export const MODEL_LADDER = [
+  'google/gemini-3.1-flash-lite-image',
   'google/gemini-3.1-flash-lite-image',
   'google/gemini-3-pro-image',
 ] as const
